@@ -77,7 +77,7 @@
 
       <button onclick="submitReview()" class="bg-green-600 text-white text-2xl px-4 py-2 rounded hover:bg-green-700">Submit</button>
       <button id="loadLast" 
-              onclick="loadLast()" 
+              onclick="loadLastSubmission()" 
               class="ml-4 bg-yellow-500 text-white text-2xl px-4 py-2 rounded hover:bg-yellow-600">Load My Last Submission
       </button>
       <div class="flex justify-between pt-4">
@@ -232,7 +232,7 @@
         }
 
 
-        loadLast();
+        // loadLast();
     }
 
     function addDepictField() {
@@ -350,7 +350,7 @@
         await render();
       }
     }
-    
+
     async function prevImage() {
       if (currentIndex > 0) {
         currentIndex--;
