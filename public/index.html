@@ -241,13 +241,16 @@
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(data)
       })
-      .then(r => r.json())
-      .then(resp => {
-        if (resp.status === 'ok') {
+      .then(async resp => {
+        // parse whatever JSON we get back (or {} if it’s not JSON)
+        const body = await resp.json().catch(() => ({}));
+
+        if (body.status === 'ok') {
           alert('✅ Review saved to server!');
           document.getElementById('comments').value = '';
         } else {
-          alert(`❌ Server error:\n${resp.message}\n\n${resp.details||''}`);
+          // show the exact error message our server sent
+          alert(`❌ Server error:\n${body.message}`);
         }
       })
       .catch(err => {
