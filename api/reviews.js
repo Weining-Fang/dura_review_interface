@@ -6,6 +6,10 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+    console.log('ENV:', {
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY?.slice(0, 4) + '…'
+      });
   if (req.method === 'POST') {
     const { image, depicts, comment, timestamp } = req.body;
 
