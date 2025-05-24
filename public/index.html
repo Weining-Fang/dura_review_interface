@@ -219,10 +219,11 @@
       const inputs = document.querySelectorAll('.depict-input');
       const comments = document.getElementById('comments').value;
       const data = {
+        timestamp: new Date().toISOString(),
         image: images[currentIndex].fname_commons,
-        depicts: Array.from(inputs).map(i => i.value),
         comment: comments,
-        timestamp: new Date().toISOString()
+        depicts: Array.from(inputs).map(i => i.value)
+
       };
       console.log('Submitted Review:', data);
 
