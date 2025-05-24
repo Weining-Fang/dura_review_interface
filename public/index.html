@@ -76,7 +76,10 @@
       </div>
 
       <button onclick="submitReview()" class="bg-green-600 text-white text-2xl px-4 py-2 rounded hover:bg-green-700">Submit</button>
-
+      <button id="loadLast" 
+              onclick="loadLast()" 
+              class="ml-4 bg-yellow-500 text-white text-2xl px-4 py-2 rounded hover:bg-yellow-600">Load My Last Submission
+      </button>
       <div class="flex justify-between pt-4">
         <button onclick="prevImage()" class="bg-blue-600 text-white text-2xl px-4 py-2 rounded hover:bg-blue-700">&larr; Previous</button>
         <button onclick="nextImage()" class="bg-blue-600 text-white text-2xl px-4 py-2 rounded hover:bg-blue-700">Next &rarr;</button>
@@ -195,6 +198,8 @@
         group2.appendChild(input2);
 
         container.appendChild(group2);
+
+        loadLast();
     }
 
     function addDepictField() {
@@ -260,7 +265,11 @@
         body:    form.toString()
       })
       .then(r => r.text())
-      .then(() => alert('✅ Review saved!'))
+      .then(() => {
+        alert('✅ Review saved!');
+        const key = 'review_' + data.image;
+        localStorage.setItem(key, JSON.stringify(data));
+      })
       .catch(() => alert('❌ Error'));
 
       // For now, append to localStorage
@@ -271,30 +280,28 @@
       // alert('Review saved!');
       // document.getElementById('comments').value = '';
 
-      // supabase ver
-      // fetch('/api/reviews', {
-      //   method:  'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body:    JSON.stringify(data)
-      // })
-      // .then(async resp => {
-      //   // parse whatever JSON we get back (or {} if it’s not JSON)
-      //   const body = await resp.json().catch(() => ({}));
-
-      //   if (body.status === 'ok') {
-      //     alert('✅ Review saved to server!');
-      //     document.getElementById('comments').value = '';
-      //   } else {
-      //     // show the exact error message our server sent
-      //     alert(`❌ Server error:\n${body.message}`);
-      //   }
-      // })
-      // .catch(err => {
-      //   console.error('Network error:', err);
-      //   alert('⚠️ Could not send review');
-      // });
     }
 
+    function loadLast() {
+      const imageName = images[currentIndex].fname_commons;
+      const key       = 'review_' + imageName;
+      const savedRaw  = localStorage.getItem(key);
+      if (!savedRaw) {
+        // alert("ℹ️ No saved submission yet — loading defaults.");
+        return render();   // re-render from imageData
+      }
+
+      const saved = JSON.parse(savedRaw);
+
+      // 1) repopulate your depict fields
+      const inputs = document.querySelectorAll('.depict-input');
+      inputs.forEach((input, idx) => {
+        input.value = saved.depicts[idx] || '';
+      });
+
+      // 2) repopulate comments
+      document.getElementById('comments').value = saved.comment || '';
+    }
     // add one more option for loading the last-submitted response in case the reviewer wanna go back to modify it 
 
 
