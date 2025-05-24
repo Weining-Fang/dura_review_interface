@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('Insert error:', error);
-      return res.status(500).json({ status: 'error', message: error.message });
+      return res.status(500).json({ status: 'error', message: error.message, details: error.details});
     }
     return res.status(200).json({ status: 'ok', data });
   }
