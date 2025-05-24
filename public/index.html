@@ -228,6 +228,41 @@
       };
       console.log('Submitted Review:', data);
 
+      const form = new URLSearchParams();
+      form.append('timestamp', data.timestamp);
+      form.append('image',     data.image);
+      form.append('depicts',   data.depicts.join('||'));
+      form.append('comment',   data.comment);
+
+      // fetch(
+      //   'https://script.google.com/macros/s/AKfycbwWSfFvXergearFJ7LhDM8yq45V_HLyUc7KJX2uSEFK8qGrZuKJ7_zmGQggETib3mA-/exec',
+      //   {
+      //     method:  'POST',
+      //     mode:    'no-cors',                      // ← bypass CORS entirely
+      //     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      //     body:    form.toString()
+      //   }
+      // )
+      // // Since mode:no-cors makes the response opaque, we can't read it.
+      // // Instead, assume success if fetch() itself doesn't throw:
+      // .then(() => {
+      //   alert('✅ Review sent!');
+      //   document.getElementById('comments').value = '';
+      // })
+      // .catch(err => {
+      //   console.error('Network error:', err);
+      //   alert('⚠️ Could not send review');
+      // });
+
+      fetch('/api/sheet', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    form.toString()
+      })
+      .then(r => r.text())
+      .then(() => alert('✅ Review saved!'))
+      .catch(() => alert('❌ Error'));
+
       // For now, append to localStorage
       // const prev = JSON.parse(localStorage.getItem('reviews') || '[]');
       // prev.push(data);
@@ -236,27 +271,28 @@
       // alert('Review saved!');
       // document.getElementById('comments').value = '';
 
-      fetch('/api/reviews', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(data)
-      })
-      .then(async resp => {
-        // parse whatever JSON we get back (or {} if it’s not JSON)
-        const body = await resp.json().catch(() => ({}));
+      // supabase ver
+      // fetch('/api/reviews', {
+      //   method:  'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body:    JSON.stringify(data)
+      // })
+      // .then(async resp => {
+      //   // parse whatever JSON we get back (or {} if it’s not JSON)
+      //   const body = await resp.json().catch(() => ({}));
 
-        if (body.status === 'ok') {
-          alert('✅ Review saved to server!');
-          document.getElementById('comments').value = '';
-        } else {
-          // show the exact error message our server sent
-          alert(`❌ Server error:\n${body.message}`);
-        }
-      })
-      .catch(err => {
-        console.error('Network error:', err);
-        alert('⚠️ Could not send review');
-      });
+      //   if (body.status === 'ok') {
+      //     alert('✅ Review saved to server!');
+      //     document.getElementById('comments').value = '';
+      //   } else {
+      //     // show the exact error message our server sent
+      //     alert(`❌ Server error:\n${body.message}`);
+      //   }
+      // })
+      // .catch(err => {
+      //   console.error('Network error:', err);
+      //   alert('⚠️ Could not send review');
+      // });
     }
 
     // add one more option for loading the last-submitted response in case the reviewer wanna go back to modify it 
