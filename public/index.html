@@ -247,7 +247,7 @@
           alert('✅ Review saved to server!');
           document.getElementById('comments').value = '';
         } else {
-          alert('❌ Server error: ' + (resp.error||'unknown'));
+          alert('❌ Server error:\n' + JSON.stringify(resp.error, null, 2));
         }
       })
       .catch(err => {
