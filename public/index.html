@@ -333,6 +333,7 @@
     //   document.getElementById('comments').value = saved.comment || '';
     // }
     async function loadLastSubmission(imageName) {
+      const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwWSfFvXergearFJ7LhDM8yq45V_HLyUc7KJX2uSEFK8qGrZuKJ7_zmGQggETib3mA-/exec';
       try {
         const res = await fetch(`${SHEET_URL}?image=${encodeURIComponent(imageName)}`);
         if (!res.ok) return null;
