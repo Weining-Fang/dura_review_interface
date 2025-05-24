@@ -199,6 +199,8 @@
 
         container.appendChild(group2);
 
+        document.getElementById('comments').value = '';  
+
         loadLast();
     }
 
@@ -286,23 +288,19 @@
       const imageName = images[currentIndex].fname_commons;
       const key       = 'review_' + imageName;
       const savedRaw  = localStorage.getItem(key);
-      if (!savedRaw) {
-        // alert("ℹ️ No saved submission yet — loading defaults.");
-        return render();   // re-render from imageData
-      }
+      if (!savedRaw) return;    // ← no more render() call!
 
       const saved = JSON.parse(savedRaw);
 
-      // 1) repopulate your depict fields
+      // repopulate depict fields
       const inputs = document.querySelectorAll('.depict-input');
       inputs.forEach((input, idx) => {
         input.value = saved.depicts[idx] || '';
       });
 
-      // 2) repopulate comments
+      // repopulate comments
       document.getElementById('comments').value = saved.comment || '';
     }
-    // add one more option for loading the last-submitted response in case the reviewer wanna go back to modify it 
 
 
     function nextImage() {
