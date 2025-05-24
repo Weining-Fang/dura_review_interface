@@ -227,8 +227,7 @@
         document.getElementById('comments').value = '';  
         document.querySelectorAll('.depict-input').forEach(input => {
           const lvl = input.dataset.depictLevel;
-          if (lvl) input.value = imageData[`depict_l${lvl}`] || '';
-          else      input.value = '';
+          input.value = imageData[`depict_l${lvl}`] || '';
         });
 
         // 2) try to load the last sheet‐recorded review for this image
@@ -370,8 +369,8 @@
     // Initial render
     // render();
     fetch('image_depict_url.json')
-    .then(r => r.json())
-    .then(data => { images = data; render(); });
+      .then(r => r.json())
+      .then(data => { images = data; render(); });
   </script>
 </body>
 </html>
