@@ -46,7 +46,7 @@
     .content-right {
       margin-left: 50%;
       padding: 15rem 1rem 1rem 1rem;
-      margin-top: -4rem;
+      margin-top: -5rem;
     }
   </style>
 </head>
@@ -130,6 +130,19 @@
         // populate title + filename
         const info = document.getElementById('imageInfo');
         info.textContent = '';          // clear it out
+
+        // Object id
+        const objIDEl = document.createElement('p');
+        objIDEl.className = 'text-2xl text-black';
+        const objIDLabel = document.createElement('span');
+        objIDLabel.className = 'font-bold';
+        objIDLabel.textContent = 'Object ID: ';
+        const objIDValue = document.createElement('span');
+        objIDValue.className = 'font-normal';
+        objIDValue.textContent = imageData.object_id || 'Untitled';
+        objIDEl.appendChild(objIDLabel);
+        objIDEl.appendChild(objIDValue);
+        info.appendChild(objIDEl);
 
         // Title
         const titleEl = document.createElement('p');
@@ -233,7 +246,7 @@
         depicts: Array.from(inputs).map(i => i.value)
 
       };
-      console.log('Submitted Review:', data);
+      // console.log('Submitted Review:', data);
 
       const form = new URLSearchParams();
       form.append('timestamp', data.timestamp);
