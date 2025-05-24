@@ -87,7 +87,7 @@
     let images = [];
     let currentIndex = 0;
 
-    fetch('public/image_depict_url.json')
+    fetch('image_depict_url.json')
         .then(response => response.json())
         .then(data => {
             images = data;
