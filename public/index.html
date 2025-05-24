@@ -227,12 +227,31 @@
       console.log('Submitted Review:', data);
 
       // For now, append to localStorage
-      const prev = JSON.parse(localStorage.getItem('reviews') || '[]');
-      prev.push(data);
-      localStorage.setItem('reviews', JSON.stringify(prev));
+      // const prev = JSON.parse(localStorage.getItem('reviews') || '[]');
+      // prev.push(data);
+      // localStorage.setItem('reviews', JSON.stringify(prev));
 
-      alert('Review saved!');
-      document.getElementById('comments').value = '';
+      // alert('Review saved!');
+      // document.getElementById('comments').value = '';
+
+      fetch('/api/reviews', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data)
+      })
+      .then(r => r.json())
+      .then(resp => {
+        if (resp.status === 'ok') {
+          alert('✅ Review saved to server!');
+          document.getElementById('comments').value = '';
+        } else {
+          alert('❌ Server error: ' + (resp.error||'unknown'));
+        }
+      })
+      .catch(err => {
+        console.error('Network error:', err);
+        alert('⚠️ Could not send review');
+      });
     }
 
     // add one more option for loading the last-submitted response in case the reviewer wanna go back to modify it 
