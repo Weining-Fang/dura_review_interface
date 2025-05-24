@@ -90,6 +90,7 @@
   <script type="text/javascript">
     let images = [];
     let currentIndex = 0;
+    const SHEET_PROXY = '/api/sheet';
 
     fetch('image_depict_url.json')
         .then(response => response.json())
@@ -100,6 +101,16 @@
         .catch(err => {
             console.error("Failed to load image data:", err);
         });
+    
+    async function loadLastSubmission(imageName) {
+      try {
+        const res = await fetch(`${SHEET_PROXY}?image=${encodeURIComponent(imageName)}`);
+        if (!res.ok) return null;
+        return await res.json();   // returns object or null
+      } catch {
+        return null;
+      }
+    }
 
     async function render() {
         if (!images || images.length === 0) {
@@ -272,25 +283,6 @@
       form.append('depicts',   data.depicts.join('||'));
       form.append('comment',   data.comment);
 
-      // fetch(
-      //   'https://script.google.com/macros/s/AKfycbwWSfFvXergearFJ7LhDM8yq45V_HLyUc7KJX2uSEFK8qGrZuKJ7_zmGQggETib3mA-/exec',
-      //   {
-      //     method:  'POST',
-      //     mode:    'no-cors',                      // ← bypass CORS entirely
-      //     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      //     body:    form.toString()
-      //   }
-      // )
-      // // Since mode:no-cors makes the response opaque, we can't read it.
-      // // Instead, assume success if fetch() itself doesn't throw:
-      // .then(() => {
-      //   alert('✅ Review sent!');
-      //   document.getElementById('comments').value = '';
-      // })
-      // .catch(err => {
-      //   console.error('Network error:', err);
-      //   alert('⚠️ Could not send review');
-      // });
 
       fetch('/api/sheet', {
         method:  'POST',
@@ -332,17 +324,18 @@
     //   // repopulate comments
     //   document.getElementById('comments').value = saved.comment || '';
     // }
-    async function loadLastSubmission(imageName) {
-      try {
-        const res = await fetch(`/api/sheet?image=${encodeURIComponent(imageName)}`);
-        if (!res.ok) return null;
-        const obj = await res.json();   // either an object or null
-        return obj;
-      } catch(e) {
-        console.warn('Could not fetch saved review:', e);
-        return null;
-      }
-    }
+    
+    // async function loadLastSubmission(imageName) {
+    //   try {
+    //     const res = await fetch(`/api/sheet?image=${encodeURIComponent(imageName)}`);
+    //     if (!res.ok) return null;
+    //     const obj = await res.json();   // either an object or null
+    //     return obj;
+    //   } catch(e) {
+    //     console.warn('Could not fetch saved review:', e);
+    //     return null;
+    //   }
+    // }
 
     async function nextImage() {
       if (currentIndex < images.length - 1) {
