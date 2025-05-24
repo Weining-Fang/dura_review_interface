@@ -324,7 +324,7 @@
     //   // repopulate comments
     //   document.getElementById('comments').value = saved.comment || '';
     // }
-    
+
     // async function loadLastSubmission(imageName) {
     //   try {
     //     const res = await fetch(`/api/sheet?image=${encodeURIComponent(imageName)}`);
@@ -368,7 +368,10 @@
     // }
 
     // Initial render
-    render();
+    // render();
+    fetch('image_depict_url.json')
+    .then(r => r.json())
+    .then(data => { images = data; render(); });
   </script>
 </body>
 </html>
