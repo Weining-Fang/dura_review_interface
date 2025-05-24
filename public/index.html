@@ -101,7 +101,7 @@
             console.error("Failed to load image data:", err);
         });
 
-    function render() {
+    async function render() {
         if (!images || images.length === 0) {
             console.warn("No image data available.");
             return;
@@ -212,7 +212,25 @@
 
         container.appendChild(group2);
 
+        // 1) clear comment & inputs to the JSON defaults
         document.getElementById('comments').value = '';  
+        document.querySelectorAll('.depict-input').forEach(input => {
+          const lvl = input.dataset.depictLevel;
+          if (lvl) input.value = imageData[`depict_l${lvl}`] || '';
+          else      input.value = '';
+        });
+
+        // 2) try to load the last sheet‐recorded review for this image
+        const saved = await loadLastSubmission(imageData.fname_commons);
+        if (saved) {
+          // override with what we got back
+          saved.depicts.forEach((val, idx) => {
+            const inp = document.querySelectorAll('.depict-input')[idx];
+            if (inp) inp.value = val;
+          });
+          document.getElementById('comments').value = saved.comment || '';
+        }
+
 
         loadLast();
     }
@@ -297,40 +315,64 @@
 
     }
 
-    function loadLast() {
-      const imageName = images[currentIndex].fname_commons;
-      const key       = 'review_' + imageName;
-      const savedRaw  = localStorage.getItem(key);
-      if (!savedRaw) return;    // ← no more render() call!
+    // function loadLast() {
+    //   const imageName = images[currentIndex].fname_commons;
+    //   const key       = 'review_' + imageName;
+    //   const savedRaw  = localStorage.getItem(key);
+    //   if (!savedRaw) return;    // ← no more render() call!
 
-      const saved = JSON.parse(savedRaw);
+    //   const saved = JSON.parse(savedRaw);
 
-      // repopulate depict fields
-      const inputs = document.querySelectorAll('.depict-input');
-      inputs.forEach((input, idx) => {
-        input.value = saved.depicts[idx] || '';
-      });
+    //   // repopulate depict fields
+    //   const inputs = document.querySelectorAll('.depict-input');
+    //   inputs.forEach((input, idx) => {
+    //     input.value = saved.depicts[idx] || '';
+    //   });
 
-      // repopulate comments
-      document.getElementById('comments').value = saved.comment || '';
+    //   // repopulate comments
+    //   document.getElementById('comments').value = saved.comment || '';
+    // }
+    async function loadLastSubmission(imageName) {
+      try {
+        const res = await fetch(`${SHEET_URL}?image=${encodeURIComponent(imageName)}`);
+        if (!res.ok) return null;
+        const obj = await res.json();   // either an object or null
+        return obj;
+      } catch(e) {
+        console.warn('Could not fetch saved review:', e);
+        return null;
+      }
     }
 
-
-    function nextImage() {
+    async function nextImage() {
       if (currentIndex < images.length - 1) {
         currentIndex++;
-        render();
-      } else {
-        alert('No more images.');
+        await render();
+      }
+    }
+    
+    async function prevImage() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        await render();
       }
     }
 
-    function prevImage() {
-      if (currentIndex > 0) {
-        currentIndex--;
-        render();
-      }
-    }
+    // function nextImage() {
+    //   if (currentIndex < images.length - 1) {
+    //     currentIndex++;
+    //     render();
+    //   } else {
+    //     alert('No more images.');
+    //   }
+    // }
+
+    // function prevImage() {
+    //   if (currentIndex > 0) {
+    //     currentIndex--;
+    //     render();
+    //   }
+    // }
 
     // Initial render
     render();
