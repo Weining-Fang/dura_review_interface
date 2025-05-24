@@ -26,15 +26,18 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
-      .from('reviews')
-      .select('*')
-      .order('id', { ascending: true });
-
+    const { image } = req.query;   // grabs ?image=filename.jpg
+    let query = supabase.from('reviews').select('*').order('id', { ascending:true });
+    if (image) {
+      query = query.eq('image', image);
+    }
+  
+    const { data, error } = await query;
     if (error) {
       console.error('Select error:', error);
       return res.status(500).json({ status: 'error', error });
     }
+    // return an array (0 or 1 elements) of reviews for that image
     return res.status(200).json(data);
   }
 
