@@ -77,7 +77,7 @@
 
       <button onclick="submitReview()" class="bg-green-600 text-white text-2xl px-4 py-2 rounded hover:bg-green-700">Submit</button>
       <button id="loadLast" 
-              onclick="loadLastSubmission()" 
+              onclick="loadLast()" 
               class="ml-4 bg-yellow-500 text-white text-2xl px-4 py-2 rounded hover:bg-yellow-600">Load My Last Submission
       </button>
       <div class="flex justify-between pt-4">
@@ -242,8 +242,8 @@
           document.getElementById('comments').value = saved.comment || '';
         }
 
-
-        // loadLast();
+        // auto-load on render() 
+        await loadLast();
     }
 
     function addDepictField() {
@@ -336,6 +336,21 @@
     //     return null;
     //   }
     // }
+
+    async function loadLast() {
+      const imageName = images[currentIndex].fname_commons;
+      const saved     = await loadLastSubmission(imageName);
+      if (!saved) {
+        return alert("ℹ️ No saved submission found for this image.");
+      }
+      // 1) repopulate your two Depict fields
+      saved.depicts.forEach((val, idx) => {
+        const inp = document.querySelectorAll('.depict-input')[idx];
+        if (inp) inp.value = val;
+      });
+      // 2) repopulate comments
+      document.getElementById('comments').value = saved.comment || '';
+    }
 
     async function nextImage() {
       if (currentIndex < images.length - 1) {
