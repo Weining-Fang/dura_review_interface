@@ -1,31 +1,40 @@
 // api/sheet.js
 import fetch from 'node-fetch';
-import { URLSearchParams } from 'url';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWSfFvX…/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWSfFvXergearFJ7LhDM8yq45V_HLyUc7KJX2uSEFK8qGrZuKJ7_zmGQggETib3mA-/exec';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const params = new URLSearchParams(req.body).toString();
+    // 🚨 Buffer the raw POST body
+    let raw = '';
+    for await (const chunk of req) {
+      raw += chunk;
+    }
+    // Forward it verbatim to the Apps Script
     const sheetsRes = await fetch(SCRIPT_URL, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    params
+      headers: { 'Content-Type': req.headers['content-type'] },
+      body:    raw
     });
     const text = await sheetsRes.text();
     return res.status(sheetsRes.status).send(text);
   }
+
   if (req.method === 'GET') {
+    // Proxy the GET with image query param
     const image = req.query.image || '';
     const url   = `${SCRIPT_URL}?image=${encodeURIComponent(image)}`;
     const sheetsRes = await fetch(url);
     const text = await sheetsRes.text();
+    let json = null;
     try {
-      return res.status(200).json(JSON.parse(text));
-    } catch {
-      return res.status(200).json(null);
+      json = JSON.parse(text);
+    } catch (e) {
+      // if the script returned nothing, json stays null
     }
+    return res.status(200).json(json);
   }
+
   res.setHeader('Allow', ['GET','POST']);
-  return res.status(405).end();
+  res.status(405).end(`Method ${req.method} Not Allowed`);
 }

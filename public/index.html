@@ -107,7 +107,8 @@
         const res = await fetch(`${SHEET_PROXY}?image=${encodeURIComponent(imageName)}`);
         if (!res.ok) return null;
         return await res.json();   // returns object or null
-      } catch {
+      } catch (e) {
+        console.warn('Could not fetch saved review:', e);
         return null;
       }
     }
