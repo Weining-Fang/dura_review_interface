@@ -341,7 +341,7 @@
       const imageName = images[currentIndex].fname_commons;
       const saved     = await loadLastSubmission(imageName);
       if (!saved) {
-        return alert("ℹ️ No saved submission found for this image.");
+        return;
       }
       // 1) repopulate your two Depict fields
       saved.depicts.forEach((val, idx) => {

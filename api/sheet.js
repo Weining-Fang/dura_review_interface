@@ -21,16 +21,19 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    // Proxy the GET with image query param
     const image = req.query.image || '';
     const url   = `${SCRIPT_URL}?image=${encodeURIComponent(image)}`;
+    console.log('→ Proxying GET to', url);
+    
     const sheetsRes = await fetch(url);
-    const text = await sheetsRes.text();
+    const text      = await sheetsRes.text();
+    console.log('← Script returned:', text);
+
     let json = null;
     try {
       json = JSON.parse(text);
     } catch (e) {
-      // if the script returned nothing, json stays null
+      console.warn('Could not JSON.parse text, returning null');
     }
     return res.status(200).json(json);
   }
