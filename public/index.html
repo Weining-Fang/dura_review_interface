@@ -51,6 +51,14 @@
   </style>
 </head>
 <body class="bg-white-100">
+  <div id="initScreen" class="fixed inset-0 flex items-center justify-center bg-white z-50">
+    <div class="text-center">
+      <p class="text-2xl mb-4">Enter object-id of the image to begin:</p>
+      <input id="objectIDInput" type="text" class="text-xl border p-2 rounded w-64" placeholder="e.g. 14147">
+      <button onclick="jumpToImage()" class="ml-4 bg-blue-600 text-white px-4 py-2 text-xl rounded hover:bg-blue-700">Go</button>
+    </div>
+  </div>
+
   <!-- Fixed Image Panel -->
   <div class="fixed-left py-4 box-border">
     <a id="imageLink" href="#" target="_blank">
@@ -102,6 +110,18 @@
             console.error("Failed to load image data:", err);
         });
     
+    function jumpToImage() {
+      const inputID = document.getElementById("objectIDInput").value.trim();
+      const idx = images.findIndex(img => img.object_id == inputID);
+      if (idx === -1) {
+        alert("Object ID not found!");
+        return;
+      }
+      currentIndex = idx;
+      document.getElementById("initScreen").style.display = "none";
+      render();
+    }
+
     async function loadLastSubmission(imageName) {
       try {
         const res = await fetch(`${SHEET_PROXY}?image=${encodeURIComponent(imageName)}`);
@@ -297,45 +317,7 @@
       })
       .catch(() => alert('❌ Error'));
 
-      // For now, append to localStorage
-      // const prev = JSON.parse(localStorage.getItem('reviews') || '[]');
-      // prev.push(data);
-      // localStorage.setItem('reviews', JSON.stringify(prev));
-
-      // alert('Review saved!');
-      // document.getElementById('comments').value = '';
-
     }
-
-    // function loadLast() {
-    //   const imageName = images[currentIndex].fname_commons;
-    //   const key       = 'review_' + imageName;
-    //   const savedRaw  = localStorage.getItem(key);
-    //   if (!savedRaw) return;    // ← no more render() call!
-
-    //   const saved = JSON.parse(savedRaw);
-
-    //   // repopulate depict fields
-    //   const inputs = document.querySelectorAll('.depict-input');
-    //   inputs.forEach((input, idx) => {
-    //     input.value = saved.depicts[idx] || '';
-    //   });
-
-    //   // repopulate comments
-    //   document.getElementById('comments').value = saved.comment || '';
-    // }
-
-    // async function loadLastSubmission(imageName) {
-    //   try {
-    //     const res = await fetch(`/api/sheet?image=${encodeURIComponent(imageName)}`);
-    //     if (!res.ok) return null;
-    //     const obj = await res.json();   // either an object or null
-    //     return obj;
-    //   } catch(e) {
-    //     console.warn('Could not fetch saved review:', e);
-    //     return null;
-    //   }
-    // }
 
     async function loadLast() {
       const imageName = images[currentIndex].fname_commons;
@@ -366,27 +348,14 @@
       }
     }
 
-    // function nextImage() {
-    //   if (currentIndex < images.length - 1) {
-    //     currentIndex++;
-    //     render();
-    //   } else {
-    //     alert('No more images.');
-    //   }
-    // }
-
-    // function prevImage() {
-    //   if (currentIndex > 0) {
-    //     currentIndex--;
-    //     render();
-    //   }
-    // }
-
     // Initial render
     // render();
     fetch('image_depict_url.json')
       .then(r => r.json())
-      .then(data => { images = data; render(); });
+      .then(data => { 
+        images = data; 
+        // render(); 
+      });
   </script>
 </body>
 </html>
