@@ -110,12 +110,12 @@
             console.error("Failed to load image data:", err);
         });
     
-    document.getElementById("idInput").addEventListener("keyup", function (e) {
+    document.getElementById("objectIDInput").addEventListener("keyup", function (e) {
       if (e.key === "Enter") {
         goToImage();
       }
     });
-    
+
     function jumpToImage() {
       const inputID = document.getElementById("objectIDInput").value.trim();
       const idx = images.findIndex(img => img.object_id == inputID);
