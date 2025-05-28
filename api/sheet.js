@@ -1,21 +1,26 @@
 // api/sheet.js
 import fetch from 'node-fetch';
+import { URLSearchParams } from 'url';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWSfFvXergearFJ7LhDM8yq45V_HLyUc7KJX2uSEFK8qGrZuKJ7_zmGQggETib3mA-/exec';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    // 🚨 Buffer the raw POST body
-    let raw = '';
-    for await (const chunk of req) {
-      raw += chunk;
-    }
-    // Forward it verbatim to the Apps Script
+    // console.log('[API] Received POST request');
+    // console.log('[API] Parsed body:', req.body);
+    
+    const form = new URLSearchParams();
+    form.append('timestamp', req.body.timestamp);
+    form.append('image', req.body.image);
+    form.append('depicts', req.body.depicts);
+    form.append('comment', req.body.comment);
+    
     const sheetsRes = await fetch(SCRIPT_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': req.headers['content-type'] },
-      body:    raw
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
     });
+    
     const text = await sheetsRes.text();
     return res.status(sheetsRes.status).send(text);
   }
