@@ -1,0 +1,16 @@
+.vercel
+# dependencies
+node_modules/
+
+# build outputs
+.next/
+dist/
+build/
+
+# system files
+.DS_Store
+Thumbs.db
+
+# optional: editor files
+.vscode/
+.idea/
