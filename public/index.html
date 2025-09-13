@@ -71,8 +71,23 @@
     /* Overlay SVG */
     #overlay {
       position: fixed; /* positioned via JS to match the image box */
-      pointer-events: none; /* toggled during draw */
+      pointer-events: auto; /* keep clickable for resize/move */ /* none; toggled during draw */
       z-index: 5;
+    }
+    
+    /* Resize handles for shapes */
+    .handle {
+      cursor: pointer;
+    }
+    .handle-rect {
+      fill: white;
+      stroke: red;
+      stroke-width: 1.5;
+    }
+    .handle-ell {
+      fill: white;
+      stroke: red;
+      stroke-width: 1.5;
     }
 
     /* Right panel */
@@ -120,7 +135,7 @@
     .summary-row.active{ background:#dbeafe; }
   </style>
 </head>
-<body class="text-slate-900">
+<body class="text-slate-900" tabindex="0">
 
   <!-- Launch overlay: select a location -->
   <div id="initScreen" class="floating-init">
@@ -176,6 +191,7 @@
 
       <!-- SVG overlay is positioned in JS -->
       <svg id="overlay" width="0" height="0"></svg>
+      
     </div>
   </main>
 
@@ -577,8 +593,6 @@
 
         dl.innerHTML = scored.slice(0,50).map(({key})=>{
           const count = (groups[key]||[]).length;
-          // const label = `${key} — ${count} image${count===1?'':'s'} — ${sampleTitle(key)}`;
-          // return `<option value="${key}" label="${label}"></option>`;
           return `<option value="${key}"></option>`;
         }).join('');
       };
@@ -950,18 +964,53 @@
       shapes.forEach(s=>{
         if (s.labelEl) s.labelEl.textContent = s.label;
       });
+    }
 
+    function renumberAllShapes(){
+      // Sort shapes by their current label to maintain order
+      shapes.sort((a, b) => a.label - b.label);
+      
+      // Renumber all shapes sequentially starting from 1
+      shapes.forEach((shape, index) => {
+        const newLabel = index + 1;
+        const oldLabel = shape.label;
+        shape.label = newLabel;
+        
+        // Update the label text in the SVG
+        if (shape.labelEl) {
+          shape.labelEl.textContent = newLabel;
+        }
+        
+        // Update the label pill in the direction row
+        if (shape.rowEl) {
+          const labelPill = shape.rowEl.querySelector('.pill');
+          if (labelPill) {
+            labelPill.textContent = newLabel;
+          }
+        }
+      });
+      
+      // Update the label counter to be the next available number
+      labelCounter = shapes.length + 1;
     }
 
     function removeShape(id){
       const idx = shapes.findIndex(s => s.id === id);
       if (idx === -1) return;
       const s = shapes[idx];
+      
+      // Clear selection if removing the selected shape
+      if (selectedShape && selectedShape.id === id) {
+        clearSelection();
+      }
+      
       s.svgEl?.remove();
       s.labelEl?.remove();
       s.rowEl?.remove();
       shapes.splice(idx, 1);
-      // renumberAll();
+      
+      // Automatically renumber all remaining shapes
+      renumberAllShapes();
     }
 
     function makeRowForShape(shape, prefill=null){
@@ -1070,6 +1119,15 @@
     }
 
     function startDraw(e){
+      // don't start drawing if clicking an existing shape/label/handle
+      if (e.target.closest('.handle') ||
+          (e.target.closest('#overlay') && e.target.id !== 'overlay')) {
+        return;
+      }
+
+      // Clear any existing selection when starting to draw
+      clearSelection();
+
       const imgR = imgRect();
       if (e.clientX < imgR.left || e.clientX > imgR.right || e.clientY < imgR.top || e.clientY > imgR.bottom) return;
 
@@ -1130,7 +1188,8 @@
     function endDraw(e){
       if(!isDrawing || !tempShape) return;
       isDrawing = false;
-      qs('#overlay').style.pointerEvents = 'none';
+      // qs('#overlay').style.pointerEvents = 'none';
+      qs('#overlay').style.pointerEvents = 'auto';
 
       // compute normalized geometry
       const r = overlayRect();
@@ -1180,17 +1239,291 @@
       // const shape = { id, type: tempShape.type, geom, svgEl: tempShape.svgEl, labelEl: label, rowEl: null, label: 0 };
       const shape = { id, type: tempShape.type, geom, svgEl: tempShape.svgEl, labelEl: label, rowEl: null, label: nextLabel() };
       shapes.push(shape);
+      wireShape(shape);
       // renumberAll();
       label.textContent = shape.label;
 
       makeRowForShape(shape);
 
       label.style.cursor = 'pointer';
-      label.title = 'Click to delete this annotation';
-      label.addEventListener('click', ()=> removeShape(shape.id));
-
+      label.title = 'Click to select • Alt+Click, Delete, or Backspace key to delete (will auto-renumber remaining labels)';
+      label.addEventListener('click', (e)=>{
+        if (e.altKey || e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          removeShape(shape.id);
+        }
+      });
+      
+      // Ensure overlay is properly positioned before showing handles
+      placeOverlayToImage();
+      
+      // Use a small delay to ensure overlay positioning is complete before showing handles
+      setTimeout(() => {
+        selectShape(shape);
+      }, 10);
+      
       tempShape = null;
     }
+
+    // ======== SELECT / MOVE / RESIZE PATCH ========
+    let selectedShape = null;
+    let handles = [];        // array of {el, role}
+    let dragState = null;    // { mode:'move'|'resize', handle:'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w', startPx:{x,y}, startGeom:{} }
+
+    function clearSelection(){
+      // Reset stroke width and tooltip for previously selected shape
+      if (selectedShape && selectedShape.svgEl) {
+        selectedShape.svgEl.setAttribute('stroke-width', '2');
+        selectedShape.svgEl.removeAttribute('title');
+      }
+      
+      handles.forEach(h => h.el.remove());
+      handles = [];
+      selectedShape = null;
+    }
+
+    function selectShape(shape){
+      if (selectedShape && selectedShape.id === shape.id) return;
+      clearSelection();
+      selectedShape = shape;
+      
+      // Make selected shape more prominent
+      if (shape.svgEl) {
+        shape.svgEl.setAttribute('stroke-width', '3');
+        // Add tooltip for keyboard delete
+        shape.svgEl.setAttribute('title', 'Selected - Press Delete or Backspace key to remove');
+      }
+      
+      // Ensure document can receive keyboard events
+      document.body.focus();
+      
+      buildHandlesFor(shape);
+    }
+
+    function buildHandlesFor(shape){
+      const ov = qs('#overlay');
+      const r  = overlayRect();
+
+      const makeRectHandle = (x,y,role)=>{
+        const s = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        s.setAttribute('class','handle handle-rect');
+        s.setAttribute('x', x-5); s.setAttribute('y', y-5);
+        s.setAttribute('width', 10); s.setAttribute('height', 10);
+        s.dataset.role = role;
+        s.addEventListener('mousedown', (e)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          startResize(e, role);
+        });
+        ov.appendChild(s);
+        handles.push({ el:s, role });
+      };
+
+      const makeCircHandle = (x,y,role)=>{
+        const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        c.setAttribute('class','handle handle-ell');
+        c.setAttribute('cx', x); c.setAttribute('cy', y);
+        c.setAttribute('r', 6);
+        c.dataset.role = role;
+        c.addEventListener('mousedown', (e)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          startResize(e, role);
+        });
+        ov.appendChild(c);
+        handles.push({ el:c, role });
+      };
+
+      if (shape.type === 'rect'){
+        const x = shape.geom.x * r.width;
+        const y = shape.geom.y * r.height;
+        const w = shape.geom.w * r.width;
+        const h = shape.geom.h * r.height;
+        const cx = x + w/2, cy = y + h/2;
+
+        // corners
+        makeRectHandle(x,     y,     'nw');
+        makeRectHandle(x+w,   y,     'ne');
+        makeRectHandle(x+w,   y+h,   'se');
+        makeRectHandle(x,     y+h,   'sw');
+        // edges
+        makeRectHandle(cx,    y,     'n');
+        makeRectHandle(x+w,   cy,    'e');
+        makeRectHandle(cx,    y+h,   's');
+        makeRectHandle(x,     cy,    'w');
+
+        // enable move by dragging fill area (we keep fill=none, so bind to stroke + label)
+        shape.svgEl.style.cursor = 'move';
+        shape.svgEl.style.pointerEvents = 'all';
+        if (shape.labelEl){
+          shape.labelEl.style.cursor = 'move';
+          shape.labelEl.style.pointerEvents = 'all';
+        }
+      } else {
+        const cx = shape.geom.cx * r.width;
+        const cy = shape.geom.cy * r.height;
+        const rx = shape.geom.rx * r.width;
+        const ry = shape.geom.ry * r.height;
+
+        makeCircHandle(cx,     cy-ry, 'n');
+        makeCircHandle(cx+rx,  cy,    'e');
+        makeCircHandle(cx,     cy+ry, 's');
+        makeCircHandle(cx-rx,  cy,    'w');
+
+        shape.svgEl.style.cursor = 'move';
+        shape.svgEl.style.pointerEvents = 'all';
+        if (shape.labelEl){
+          shape.labelEl.style.cursor = 'move';
+          shape.labelEl.style.pointerEvents = 'all';
+        }
+      }
+    }
+
+    function updateHandles(){
+      if(!selectedShape) return;
+      // rebuild (simpler than computing diffs and keeps code small)
+      const keep = selectedShape;
+      clearSelection();
+      selectShape(keep);
+    }
+
+    function startMove(e, shape){
+      e.preventDefault(); 
+      e.stopPropagation();
+      
+      // Prevent drawing mode from interfering
+      if (isDrawing) return;
+      
+      selectShape(shape);
+      const r = overlayRect();
+      dragState = {
+        mode: 'move',
+        startPx: { x: e.clientX, y: e.clientY },
+        startGeom: JSON.parse(JSON.stringify(shape.geom)),
+        r
+      };
+      window.addEventListener('mousemove', onDrag);
+      window.addEventListener('mouseup', endDrag);
+    }
+
+    function startResize(e, handle){
+      e.preventDefault(); e.stopPropagation();
+      if(!selectedShape) return;
+      const r = overlayRect();
+      dragState = {
+        mode: 'resize',
+        handle,
+        startPx: { x: e.clientX, y: e.clientY },
+        startGeom: JSON.parse(JSON.stringify(selectedShape.geom)),
+        r
+      };
+      window.addEventListener('mousemove', onDrag);
+      window.addEventListener('mouseup', endDrag);
+    }
+
+    function onDrag(e){
+      if(!dragState || !selectedShape || isDrawing) return;
+      const { mode, handle, startPx, startGeom, r } = dragState;
+      const dx = (e.clientX - startPx.x) / r.width;
+      const dy = (e.clientY - startPx.y) / r.height;
+
+      if (mode === 'move'){
+        if (selectedShape.type === 'rect'){
+          let x = startGeom.x + dx;
+          let y = startGeom.y + dy;
+          x = Math.max(0, Math.min(1 - startGeom.w, x));
+          y = Math.max(0, Math.min(1 - startGeom.h, y));
+          selectedShape.geom.x = x;
+          selectedShape.geom.y = y;
+        } else {
+          let cx = startGeom.cx + dx;
+          let cy = startGeom.cy + dy;
+          // clamp so ellipse stays fully inside overlay
+          cx = Math.max(startGeom.rx, Math.min(1 - startGeom.rx, cx));
+          cy = Math.max(startGeom.ry, Math.min(1 - startGeom.ry, cy));
+          selectedShape.geom.cx = cx;
+          selectedShape.geom.cy = cy;
+        }
+        redrawShapesFromNorm();
+        updateHandles();
+        return;
+      }
+
+      // resize
+      if (selectedShape.type === 'rect'){
+        let { x, y, w, h } = startGeom;
+        const min = 0.005;
+
+        const apply = (nx, ny, nw, nh)=>{
+          // clamp within canvas
+          nx = Math.max(0, Math.min(nx, 1));
+          ny = Math.max(0, Math.min(ny, 1));
+          nw = Math.max(min, Math.min(1 - nx, nw));
+          nh = Math.max(min, Math.min(1 - ny, nh));
+          selectedShape.geom = { x:nx, y:ny, w:nw, h:nh };
+        };
+
+        switch(handle){
+          case 'n':  apply(x,      y+dy, w,       h-dy); break;
+          case 's':  apply(x,      y,    w,       h+dy); break;
+          case 'w':  apply(x+dx,   y,    w-dx,    h);    break;
+          case 'e':  apply(x,      y,    w+dx,    h);    break;
+          case 'nw': apply(x+dx,   y+dy, w-dx,    h-dy); break;
+          case 'ne': apply(x,      y+dy, w+dx,    h-dy); break;
+          case 'sw': apply(x+dx,   y,    w-dx,    h+dy); break;
+          case 'se': apply(x,      y,    w+dx,    h+dy); break;
+        }
+      } else {
+        let { cx, cy, rx, ry } = startGeom;
+        const min = 0.004;
+
+        switch(handle){
+          case 'n': ry = Math.max(min, ry - dy); cy = startGeom.cy - (ry - startGeom.ry); break;
+          case 's': ry = Math.max(min, ry + dy); cy = startGeom.cy + (ry - startGeom.ry); break;
+          case 'w': rx = Math.max(min, rx - dx); cx = startGeom.cx - (rx - startGeom.rx); break;
+          case 'e': rx = Math.max(min, rx + dx); cx = startGeom.cx + (rx - startGeom.rx); break;
+        }
+
+        // keep fully inside [0,1]
+        rx = Math.min(rx, Math.min(cx, 1-cx));
+        ry = Math.min(ry, Math.min(cy, 1-cy));
+
+        selectedShape.geom = { cx, cy, rx, ry };
+      }
+
+      redrawShapesFromNorm();
+      updateHandles();
+    }
+
+    function endDrag(){
+      window.removeEventListener('mousemove', onDrag);
+      window.removeEventListener('mouseup', endDrag);
+      dragState = null;
+    }
+
+    // When we create or restore shapes, bind selection:
+    function wireShape(shape){
+      // single click selects
+      shape.svgEl.addEventListener('click', (e)=>{ 
+        e.stopPropagation(); 
+        selectShape(shape); 
+      });
+      if (shape.labelEl) {
+        shape.labelEl.addEventListener('click', (e)=>{ 
+          e.stopPropagation(); 
+          selectShape(shape); 
+        });
+      }
+      
+      // Add move functionality
+      shape.svgEl.addEventListener('mousedown', (e)=> startMove(e, shape));
+      if (shape.labelEl) {
+        shape.labelEl.addEventListener('mousedown', (e)=> startMove(e, shape));
+      }
+    }
+    // ======== END PATCH ========
+
 
     // ---------------- ALSO-FOUND UI ----------------
     function addAlsoRow(prefill=null){
@@ -1354,7 +1687,9 @@
               ? { id, type:'rect',    geom:{ x:a.x, y:a.y, w:a.w, h:a.h },                 svgEl, labelEl:label, rowEl:null, label:+a.label }
               : { id, type:'ellipse', geom:{ cx:a.cx, cy:a.cy, rx:a.rx, ry:a.ry },         svgEl, labelEl:label, rowEl:null, label:+a.label };
             shapes.push(s);
-            label.addEventListener('click', ()=> removeShape(id));
+            wireShape(s);
+            // label.addEventListener('click', ()=> removeShape(id));
+            label.addEventListener('click', (e)=>{ if (e.altKey || e.shiftKey) removeShape(shape.id); });
           });
 
           // position and draw
@@ -1367,17 +1702,19 @@
             if (s.labelEl) s.labelEl.textContent = s.label;
           });
 
-          // next new label is max+1
-          labelCounter = Math.max(...shapes.map(s=>s.label), 0) + 1;
+          // Renumber all shapes to be sequential starting from 1
+          renumberAllShapes();
         } else {
           // No areas yet, but we might have relative rows: create invisible rows with their labels
           rel.sort((a,b)=> (+a.label||0) - (+b.label||0)).forEach(r=>{
             const id = 'shape_' + Math.random().toString(36).slice(2,9);
             const s  = { id, type:'rect', geom:{x:0,y:0,w:0,h:0}, svgEl:null, labelEl:null, rowEl:null, label:+r.label || nextLabel() };
             shapes.push(s);
+            wireShape(s);
             makeRowForShape(s, r);
           });
-          labelCounter = rel.length ? (Math.max(...rel.map(r=>+r.label||0)) + 1) : 1;
+          // Renumber all shapes to be sequential starting from 1
+          renumberAllShapes();
         }
 
         // --- scope / also / comments ---
@@ -1523,7 +1860,18 @@
 
     // 5) Hide on click/tap and on Escape
     document.addEventListener('pointerdown', hideHoverPreview);
-    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') hideHoverPreview(); });
+    document.addEventListener('keydown', (e)=>{ 
+      if (e.key === 'Escape') hideHoverPreview(); 
+      
+      // Delete selected shape with Delete or Backspace key (only if not in a text input)
+      // Support both 'Delete' and 'Del' key names for better compatibility, plus Backspace
+      if ((e.key === 'Delete' || e.key === 'Del' || e.key === 'Backspace' || e.keyCode === 46 || e.keyCode === 8)) {
+        if (selectedShape && !e.target.matches('input, textarea')) {
+          e.preventDefault();
+          removeShape(selectedShape.id);
+        }
+      }
+    });
 
     // 6) Also hide when collection view itself is entered empty space
     document.getElementById('collectionView').addEventListener('mouseenter', (e)=>{
@@ -1555,8 +1903,10 @@
     };
     document.getElementById('toolClear').onclick = ()=>{
       if(!confirm('Clear all shapes for this image?')) return;
+      clearSelection(); // Clear any selected shape
       shapes.forEach(s=>{ s.svgEl?.remove(); s.labelEl?.remove(); s.rowEl?.remove(); });
       shapes = [];
+      labelCounter = 1; // Reset label counter
     };
 
     // Hide when leaving the whole left column or the collection grid
@@ -1577,6 +1927,16 @@
     document.addEventListener('mousemove', moveDraw);
     document.addEventListener('mouseup',   endDraw);
     window.addEventListener('resize', placeOverlayToImage);
+    
+    // Clear selection when clicking on empty space (but not on shapes)
+    // Temporarily disabled to debug keyboard delete issue
+    // document.addEventListener('click', (e) => {
+    //   // Only clear if clicking on the actual overlay or image, not on shapes or handles
+    //   if ((e.target.id === 'overlay' || e.target === qs('#image')) && !e.target.closest('.handle') && !e.target.closest('rect') && !e.target.closest('ellipse') && !e.target.closest('text')) {
+    //     console.log('Clearing selection due to click on empty space');
+    //     clearSelection();
+    //   }
+    // });
 
     // load data
     fetch(DATA_FILE)
