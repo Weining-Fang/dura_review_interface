@@ -1572,6 +1572,9 @@
       const meta = imgAt(currentGroup, currentIndex);
       if(!meta) return;
 
+      // Reset the loaded image tracking when changing to a new image
+      _lastLoadedImage = null;
+
       const imgEl = qs('#image');
       imgEl.src = meta.url || '';
       qs('#imageLink').href = meta.page_url || '';
@@ -1634,9 +1637,17 @@
       }
     }
 
+    // Track the last loaded image to prevent duplicate loading
+    let _lastLoadedImage = null;
+
     async function loadExisting() {
       const meta = imgAt(currentGroup, currentIndex);
       if (!meta) return;
+
+      // Prevent duplicate loading for the same image
+      const currentImageKey = `${currentGroup}-${currentIndex}-${meta.fname_commons}`;
+      if (_lastLoadedImage === currentImageKey) return;
+      _lastLoadedImage = currentImageKey;
 
       try {
         const res = await fetch(`${SHEET_PROXY}?image=${encodeURIComponent(meta.fname_commons)}`);
