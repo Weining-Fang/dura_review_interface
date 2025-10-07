@@ -107,11 +107,15 @@
 
     .item-active{ background:#dbeafe; }
 
-    /* Launch overlay -> location chooser */
+    /* Launch overlay -> name prompt modal */
     .floating-init{
       position: fixed; inset:0; display:flex; align-items:center; justify-content:center;
-      background: rgba(255,255,255,.96); z-index:50;
+      background: transparent; z-index:90;
     }
+    /* Blur and disable app while asking for name */
+    .app-blurred .left-nav,
+    .app-blurred .center,
+    .app-blurred .right{ filter: blur(3px); pointer-events: none; user-select: none; }
 
     /* Number pill in direction rows */
     .pill{
@@ -133,23 +137,60 @@
     .tool-btn.danger{ color:#dc2626; border-color:#fecaca; background:#fff5f5; }
   
     .summary-row.active{ background:#dbeafe; }
+
+    /* Floating helper thumbnail (bottom-right) */
+    .floating-thumb-wrap{
+      position: fixed; right: 12px; bottom: 12px; z-index: 80; line-height: 0;
+    }
+    .floating-thumb{
+      position: relative; display:block; width:128px; height:128px;
+      border:1px solid #e5e7eb; border-radius:.5rem; background:#fff;
+      box-shadow: 0 6px 22px rgba(0,0,0,.15);
+      cursor: pointer; transform-origin: bottom right;
+      transition: transform .22s ease, box-shadow .22s ease;
+      background-size: cover; background-position: center; background-repeat: no-repeat;
+    }
+    .floating-thumb-wrap.open .floating-thumb{
+      transform: scale(4.5);
+      box-shadow: 0 18px 55px rgba(0,0,0,.3);
+    }
+    .floating-backdrop{
+      position: fixed; inset:0; z-index:70; display:none; background: transparent;
+    }
+    .floating-backdrop.show{ display:block; }
+
+    /* (overlay image removed - background only) */
+
+    /* Hotspots inside the thumbnail (percentage based) */
+    .hotspots{ position:absolute; inset:0; }
+    .hotspot{
+      position:absolute; background: transparent; border:2px dashed transparent;
+      border-radius:.25rem; cursor:pointer;
+    }
+    .hotspot:hover, .hotspot:focus{ outline: none; border-color:#6366f1; }
+    .hotspot:focus-visible{ outline: 2px solid #6366f1; outline-offset: 1px; }
+
+    /* Hide hotspots when thumbnail is small */
+    .floating-thumb .hotspots{ opacity:0; pointer-events:none; }
+    .floating-thumb-wrap.open .hotspots{ opacity:1; pointer-events:auto; }
   </style>
 </head>
 <body class="text-slate-900" tabindex="0">
 
-  <!-- Launch overlay: select a location -->
+  <!-- Launch overlay: name prompt (content is visible behind but blurred/inert) -->
   <div id="initScreen" class="floating-init">
-    <div class="text-center space-y-3">
-      <p class="text-2xl">Select a location to begin</p>
-      <div class="flex items-center gap-2 justify-center">
-        <select id="locationSelect" class="border rounded p-2 text-lg min-w-64"></select>
-        <input id="annotatorName"
-              class="border rounded p-2 text-lg min-w-64"
-              placeholder="Your name (for attribution)">
-        <!-- <div class="text-xs text-slate-500">Saved locally so you don't have to retype.</div> -->
-        <button onclick="startFromLocation()" class="bg-blue-600 text-white px-4 py-2 text-lg rounded hover:bg-blue-700">Start</button>
+    <div class="bg-white/95 border rounded-lg shadow-xl p-5 w-[min(90vw,560px)]">
+      <div class="text-center mb-3">
+        <p class="text-xl font-semibold">Welcome</p>
+        <p class="text-slate-600 text-sm">Please enter your name to begin</p>
       </div>
-      <div class="text-sm text-slate-500">You can change images from the left list any time.</div>
+      <div class="flex items-center gap-2 justify-center">
+        <input id="annotatorName" aria-label="Your name"
+               class="border rounded p-2 text-lg min-w-64"
+               placeholder="Your name (for attribution)">
+        <button onclick="startFromLocation()" class="bg-blue-600 text-white px-4 py-2 text-lg rounded hover:bg-blue-700">Continue</button>
+      </div>
+      <div class="text-xs text-slate-500 text-center mt-2">Your name is stored locally for convenience.</div>
     </div>
   </div>
 
@@ -250,6 +291,16 @@
     </div>
   </aside>
 
+  <!-- Floating helper thumbnail (bottom-right) -->
+  <!-- To change images: swap background 'data-bg' and overlay 'src' below -->
+  <div id="floatingThumb" class="floating-thumb-wrap" aria-label="Open helper widget" role="button">
+    <div class="floating-thumb" data-bg="https://upload.wikimedia.org/wikipedia/commons/e/e2/Dura-Europos_plan.png">
+      <!-- Hotspots container; grid is auto-generated in JS. Configure cell size: data-cell-w / data-cell-h (percent). -->
+      <div class="hotspots" data-cell-w="15" data-cell-h="14" data-label="Cell"></div>
+    </div>
+  </div>
+  <div id="floatingBackdrop" class="floating-backdrop"></div>
+
   <script>
     // const SHEET_PROXY = '/api/sheet';
     const SHEET_PROXY = 'https://script.google.com/macros/s/AKfycbyHmER1r8qiNUN0iI0LtixMJ1KXFmQzO2opNjw5fswMLfL-WqXGGyTFtzLuiPXU-oOG/exec';
@@ -265,6 +316,14 @@
     let currentIndex = 0;       // index within currentGroup
     let uiMode = 'collection';  // 'collection' | 'annotate'
     let annotator = localStorage.getItem('annotator_name') || '';
+    // If no name yet, blur the app and keep init modal visible; otherwise hide modal
+    if (!annotator) {
+      document.body.classList.add('app-blurred');
+      console.log('[INIT] No annotator set — app blurred and name modal shown');
+    } else {
+      const init = document.getElementById('initScreen'); if (init) init.style.display = 'none';
+      console.log('[INIT] Annotator present — name modal hidden:', annotator);
+    }
     let labelCounter = 1;           // next label to assign for new shapes
     const nextLabel = () => labelCounter++;
     let _lastMouse = { x: 0, y: 0 };
@@ -283,6 +342,7 @@
     let scopeChoice = 'field_current'; // default
     const qs  = sel => document.querySelector(sel);
     const qsa = sel => Array.from(document.querySelectorAll(sel));
+    let _treeFirstRender = true; // open all sections on first render
 
     function fitIntegerBox(nw, nh, maxW, maxH){
       if (!nw || !nh) return {w: Math.floor(maxW), h: Math.floor(maxH)};
@@ -327,6 +387,7 @@
 
     // ---------------- COLLECTION GRID ----------------
     function renderCollection(){
+      console.log('[COLLECTION] Rendering', { group: currentGroup, count: (groups[currentGroup]||[]).length });
       const grid = qs('#grid');
       grid.innerHTML = '';
       const items = groups[currentGroup] || [];
@@ -462,7 +523,7 @@
       _hoverOwner = null;
       _hoverToken++;                // invalidate any in-flight preview work
       p.classList.add('hidden');
-      p.innerHTML = '';             // clear DOM so nothing can “reappear”
+      p.innerHTML = '';             // clear DOM so nothing can "reappear"
     }
 
     // ---------------- LEFT TREE ----------------
@@ -766,22 +827,26 @@
 
 
     function renderTree(filter='') {
+      console.log('[TREE] Render start', { filter: (filter||'') });
       const tree = qs('#tree');
       tree.innerHTML = '';
-      const filterLC = (filter || '').trim().toLowerCase();
+      const rawFilter = (filter || '').trim();
+      const filterLC = rawFilter.toLowerCase();
+      const isWildcard = (filterLC === '*' || filterLC === 'all');
+      let _renderedKeysCounter = 0;
 
       orderedKeys.forEach(key => {
         const items = groups[key] || [];
         const filtered = items.filter(it => {
-          if (!filterLC) return true;
+          if (!filterLC || isWildcard) return true; // wildcard behaves like show-all but keeps "filtered mode"
           return (it.object_id || '').toLowerCase().includes(filterLC) ||
                 (it.fname_commons || '').toLowerCase().includes(filterLC) ||
                 (it.fname_scrape  || '').toLowerCase().includes(filterLC);
         });
-        if (filterLC && filtered.length === 0) return;
+        if (filterLC && !isWildcard && filtered.length === 0) return;
 
         const det = document.createElement('details');
-        det.open = key === currentGroup || !!filterLC;
+        det.open = _treeFirstRender || !!filterLC || (key === currentGroup);
 
         // --- SUMMARY ROW ---
         const sum = document.createElement('summary');
@@ -884,7 +949,11 @@
 
         det.appendChild(ul);
         tree.appendChild(det);
+        _renderedKeysCounter++;
       });
+      // after first render, allow normal open/close behavior
+      console.log('[TREE] Render complete', { renderedKeys: _renderedKeysCounter, firstRender: _treeFirstRender });
+      _treeFirstRender = false;
     }
 
     // ---------------- RIGHT: BASIC INFO ----------------
@@ -1601,25 +1670,13 @@
 
     // ---------------- NAV ----------------
     function startFromLocation(){
-      const sel = qs('#locationSelect');
       const name = (qs('#annotatorName')?.value || '').trim();
-
-      if(!sel.value) return;
-      if (!name) {
-        alert('Please enter your name (for the "user" field).');
-        return;
-      }
-
+      if (!name) { alert('Please enter your name (for the "user" field).'); return; }
       annotator = name;
       localStorage.setItem('annotator_name', annotator);
-      const badge = qs('#whoBadge');
-      if (badge) badge.textContent = `Annotator: ${annotator}`;
-      
-      currentGroup = sel.value;
-      currentIndex = 0;
-      qs('#initScreen').style.display = 'none';
-      switchToCollection();
-      renderTree(qs('#filterInput').value);
+      const badge = qs('#whoBadge'); if (badge) badge.textContent = `Annotator: ${annotator}`;
+      const init = qs('#initScreen'); if (init) init.style.display = 'none';
+      document.body.classList.remove('app-blurred');
     }
 
     async function nextImage(){ /* kept for compatibility; unused now */ }
@@ -1857,7 +1914,7 @@
     document.querySelector('.center').addEventListener('mouseleave', hideHoverPreview);
     document.querySelector('.right').addEventListener('mouseenter', hideHoverPreview);
 
-    // 3) Global guard: if the pointer isn’t over a tile, the left tree, or the hover itself, hide it
+    // 3) Global guard: if the pointer isn't over a tile, the left tree, or the hover itself, hide it
     document.addEventListener('pointermove', (e)=>{
       const t = e.target;
       const overTile   = t.closest('.tile');
@@ -1898,6 +1955,7 @@
 
     // left filter
     document.getElementById("filterInput").addEventListener("input", e=>{
+      console.log('[FILTER] Input changed', { value: e.target.value });
       renderTree(e.target.value);
     });
 
@@ -1950,33 +2008,175 @@
     // });
 
     // load data
+    console.log('[DATA] Fetch start', { url: DATA_FILE });
     fetch(DATA_FILE)
       .then(r=>r.json())
       .then(data=>{
+        console.log('[DATA] JSON parsed');
         groups = data || {};
         orderedKeys = Object.keys(groups);
+        console.log('[DATA] Groups extracted', { groupsCount: orderedKeys.length });
         flattenAll();
 
-        // populate dropdown
+        // populate dropdown (if present)
         const sel = qs('#locationSelect');
-        sel.innerHTML = orderedKeys.map(k => {
-          const cnt = (groups[k]||[]).length;
-          return `<option value="${k}">${k} (${cnt})</option>`;
-        }).join('');
-        if(orderedKeys.length === 0){
-          sel.innerHTML = `<option value="">(no locations found)</option>`;
+        if (sel) {
+          sel.innerHTML = orderedKeys.map(k => {
+            const cnt = (groups[k]||[]).length;
+            return `<option value="${k}">${k} (${cnt})</option>`;
+          }).join('');
+          if(orderedKeys.length === 0){
+            sel.innerHTML = `<option value="">(no locations found)</option>`;
+          }
+        } else {
+          console.log('[INIT] No #locationSelect present — skipping dropdown population');
         }
 
-        renderTree(); // wait for user to start
+        if (orderedKeys.length > 0){
+          currentGroup = orderedKeys[0];
+          currentIndex = 0;
+          if (annotator && annotator.trim()){
+            const init = qs('#initScreen'); if (init) init.style.display = 'none';
+            document.body.classList.remove('app-blurred');
+            console.log('[INIT] Annotator present at load — switching to collection');
+            switchToCollection();
+          }
+          // Leave input empty and simulate a user input to reuse the same path
+          const filterInput = qs('#filterInput');
+          if (filterInput) {
+            filterInput.value = '';
+            console.log('[FILTER] Auto-trigger on startup with empty string');
+            const evt = new Event('input', { bubbles: true });
+            filterInput.dispatchEvent(evt);
+          } else {
+            console.log('[TREE] Initial render (empty filter)');
+            renderTree('');
+          }
+        } else {
+          console.log('[TREE] Initial render with no groups');
+          renderTree();
+        }
       })
       .catch(err=>{
         console.error('Failed to load data file:', err);
+        console.log('[DATA] Fetch failed', err && err.message ? err.message : err);
+        // Ensure tree still attempts an empty render to surface any other issues
+        try { renderTree(''); } catch(e2) { console.warn('[TREE] Fallback render failed', e2); }
       });
     
     const nameInput = qs('#annotatorName');
     if (nameInput) nameInput.value = annotator;  
     // NEW: enable location autocomplete in the scope block
     attachLocationAutocomplete(qs('#scopeLocation'));
+
+    // ---- Floating helper thumbnail (bottom-right) ----
+    (function(){
+      // Floating widget behavior + hotspot wiring
+      const wrap = document.getElementById('floatingThumb');
+      const backdrop = document.getElementById('floatingBackdrop');
+      const thumb = wrap ? wrap.querySelector('.floating-thumb') : null;
+      if (!wrap || !backdrop || !thumb) return;
+
+      // Set background image from data attribute (swap URL here)
+      // Change the 'data-bg' value on .floating-thumb to update the background image
+      const bgUrl = thumb.getAttribute('data-bg');
+      if (bgUrl) thumb.style.backgroundImage = `url("${bgUrl}")`;
+
+      const setHotspotsTabIndex = (tabIndex) => {
+        const hs = thumb.querySelectorAll('.hotspot');
+        hs.forEach(el => el.setAttribute('tabindex', String(tabIndex)));
+      };
+
+      const open = ()=>{ wrap.classList.add('open'); backdrop.classList.add('show'); setHotspotsTabIndex(0); };
+      const close = ()=>{ wrap.classList.remove('open'); backdrop.classList.remove('show'); setHotspotsTabIndex(-1); };
+
+      // Toggle open on clicking the thumbnail background/overlay, but not hotspots
+      thumb.addEventListener('click', (e)=>{
+        const t = e.target;
+        // If clicking a hotspot while open, let hotspot handle it; otherwise allow toggle
+        if (t && t.classList && t.classList.contains('hotspot') && wrap.classList.contains('open')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (wrap.classList.contains('open')) close(); else open();
+      });
+
+      backdrop.addEventListener('click', close);
+      document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') close(); });
+
+      // Hotspot configuration
+      // 1) Auto-generate grid if container has data-cell-w / data-cell-h
+      const hotspotsHost = thumb.querySelector('.hotspots');
+      const cellW = hotspotsHost ? parseFloat(hotspotsHost.getAttribute('data-cell-w')||'0') : 0;
+      const cellH = hotspotsHost ? parseFloat(hotspotsHost.getAttribute('data-cell-h')||'0') : 0;
+      const defaultLabel = hotspotsHost ? (hotspotsHost.getAttribute('data-label')||'Cell') : 'Cell';
+      if (hotspotsHost && cellW > 0 && cellH > 0) {
+        const cols = Math.max(1, Math.floor(100 / cellW));
+        const rows = Math.max(1, Math.floor(100 / cellH));
+        hotspotsHost.innerHTML = '';
+        for (let r = 0; r < rows; r++){
+          for (let c = 0; c < cols; c++){
+            const x = c * cellW;
+            const y = r * cellH;
+            const btn = document.createElement('button');
+            btn.className = 'hotspot';
+            btn.setAttribute('data-x', String(x));
+            btn.setAttribute('data-y', String(y));
+            btn.setAttribute('data-width', String(cellW));
+            btn.setAttribute('data-height', String(cellH));
+            const label = `${defaultLabel} ${r+1}-${c+1}`;
+            btn.setAttribute('data-message', label);
+            btn.setAttribute('aria-label', label);
+            hotspotsHost.appendChild(btn);
+          }
+        }
+      }
+
+      // 2) Read hotspots (either pre-defined or generated above) and apply styles/handlers
+      const hotspots = Array.from(thumb.querySelectorAll('.hotspot'));
+      const applyBoxFromData = (el)=>{
+        const x = parseFloat(el.getAttribute('data-x')||'0');
+        const y = parseFloat(el.getAttribute('data-y')||'0');
+        const w = parseFloat(el.getAttribute('data-width')||'0');
+        const h = parseFloat(el.getAttribute('data-height')||'0');
+        el.style.left = x + '%';
+        el.style.top = y + '%';
+        el.style.width = w + '%';
+        el.style.height = h + '%';
+        // Default to unfocusable until opened; open() will set tabindex=0
+        el.setAttribute('tabindex', wrap.classList.contains('open') ? '0' : '-1');
+        if (!el.getAttribute('aria-label')) {
+          const m = el.getAttribute('data-message') || 'Hotspot';
+          el.setAttribute('aria-label', m);
+        }
+      };
+
+      const triggerMessage = (msg)=>{
+        // Replace alert with project-standard notification/toast if available
+        alert(msg || '');
+      };
+
+      hotspots.forEach((el)=>{
+        applyBoxFromData(el);
+        el.addEventListener('click', (e)=>{
+          if (!wrap.classList.contains('open')) {
+            // When closed, let the click bubble to thumb to open it
+            return;
+          }
+          e.stopPropagation();
+          triggerMessage(el.getAttribute('data-message'));
+        });
+        el.addEventListener('keydown', (e)=>{
+          if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space'){
+            if (!wrap.classList.contains('open')) return; // only trigger when open
+            e.preventDefault(); e.stopPropagation();
+            triggerMessage(el.getAttribute('data-message'));
+          }
+        });
+      });
+
+      // Open by default on start
+      open();
+    })();
 
   </script>
 </body>
