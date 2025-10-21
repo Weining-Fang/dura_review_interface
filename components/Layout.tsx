@@ -18,17 +18,17 @@ export default function Layout({ leftPanel, centerPanel, rightPanel }: LayoutPro
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-gray-50">
       {/* Left Panel - Map View */}
-      <div className="w-2/5 flex flex-col border-r border-gray-200 bg-white relative">
+      <div className="w-2/5 flex flex-col border-r border-gray-200 bg-white relative min-h-0">
         {leftPanel}
       </div>
 
       {/* Center Panel - Gallery or Detail View */}
-      <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden min-h-0">
         {centerPanel}
       </div>
 
       {/* Right Panel - Facets and Metadata */}
-      <div className="w-1/4 flex flex-col border-l border-gray-200 bg-white overflow-y-auto">
+      <div className="w-1/4 flex flex-col border-l border-gray-200 bg-white overflow-y-auto min-h-0">
         {rightPanel}
       </div>
     </div>
@@ -42,7 +42,7 @@ interface PanelProps {
 
 export function LeftPanel({ children, className = '' }: PanelProps) {
   return (
-    <div className={`w-2/5 flex flex-col border-r border-gray-200 bg-white relative ${className}`}>
+    <div className={`w-2/5 flex flex-col border-r border-gray-200 bg-white relative min-h-0 ${className}`}>
       {children}
     </div>
   );
@@ -50,7 +50,7 @@ export function LeftPanel({ children, className = '' }: PanelProps) {
 
 export function CenterPanel({ children, className = '' }: PanelProps) {
   return (
-    <div className={`flex-1 flex flex-col bg-gray-50 overflow-hidden ${className}`}>
+    <div className={`flex-1 flex flex-col bg-gray-50 overflow-hidden min-h-0 ${className}`}>
       {children}
     </div>
   );
@@ -58,7 +58,7 @@ export function CenterPanel({ children, className = '' }: PanelProps) {
 
 export function RightPanel({ children, className = '' }: PanelProps) {
   return (
-    <div className={`w-1/4 flex flex-col border-l border-gray-200 bg-white overflow-y-auto ${className}`}>
+    <div className={`w-1/4 flex flex-col border-l border-gray-200 bg-white overflow-y-auto min-h-0 ${className}`}>
       {children}
     </div>
   );

@@ -5,7 +5,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { useStore } from '../store/useStore';
 
 interface MapViewProps {
@@ -69,9 +68,18 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
       setMapLoaded(true);
       setMapReady(true);
       console.log('Map loaded successfully');
+      // Ensure the map sizes correctly after initial render
+      map.current && map.current.resize();
     });
 
+    // Resize on window size changes
+    const handleResize = () => {
+      map.current && map.current.resize();
+    };
+    window.addEventListener('resize', handleResize);
+
     return () => {
+      window.removeEventListener('resize', handleResize);
       if (map.current) {
         map.current.remove();
         map.current = null;

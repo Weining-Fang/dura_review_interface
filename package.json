@@ -34,9 +34,13 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/Weining-Fang/dura_review_interface/issues"
   },
-  "homepage": "https://github.com/Weining-Fang/dura_review_interface#readme"
+  "homepage": "https://github.com/Weining-Fang/dura_review_interface#readme",
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.0"
+  }
 }

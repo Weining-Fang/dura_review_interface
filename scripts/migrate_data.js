@@ -47,6 +47,7 @@ async function main() {
   // Step 1: Extract unique site IDs and create site records
   console.log('📍 Step 1: Extracting sites from image data...');
   const sitesMap = new Map();
+  let uniqueImages = [];
 
   for (const [siteCode, images] of Object.entries(data)) {
     if (!sitesMap.has(siteCode)) {
@@ -160,47 +161,51 @@ async function main() {
 
   // Step 4: Insert images into database
   console.log('\n🖼️  Step 4: Inserting images into database...');
-  const images = [];
-  let imageCount = 0;
+  
+  // First, deduplicate images by ID (keep the first occurrence)
+  const imagesMap = new Map();
+  let duplicatesCount = 0;
 
   for (const [siteCode, siteImages] of Object.entries(data)) {
     for (const img of siteImages) {
-      images.push({
-        id: img.object_id,
-        site_id: siteCode,
-        url: img.url,
-        filename: img.fname_commons || img.fname_scrape,
-        description: img.fname_scrape,
-        season: extractSeason(img),
-        keywords: extractKeywords(img),
-        depict_l1: img.depict_l1,
-        depict_l2: img.depict_l2
-      });
-      imageCount++;
-
-      // Insert in batches of 100 to avoid timeouts
-      if (images.length >= 100) {
-        const { error } = await supabase.from('images').upsert(images, { onConflict: 'id' });
-        if (error) {
-          console.error('❌ Error inserting image batch:', error);
-          throw error;
-        }
-        console.log(`  Inserted ${imageCount} images...`);
-        images.length = 0; // Clear array
+      const imageId = img.object_id;
+      
+      if (!imagesMap.has(imageId)) {
+        imagesMap.set(imageId, {
+          id: imageId,
+          site_id: siteCode,
+          url: img.url,
+          filename: img.fname_commons || img.fname_scrape,
+          description: img.fname_scrape,
+          season: extractSeason(img),
+          keywords: extractKeywords(img),
+          depict_l1: img.depict_l1,
+          depict_l2: img.depict_l2
+        });
+      } else {
+        duplicatesCount++;
       }
     }
   }
 
-  // Insert remaining images
-  if (images.length > 0) {
-    const { error } = await supabase.from('images').upsert(images, { onConflict: 'id' });
-    if (error) {
-      console.error('❌ Error inserting final image batch:', error);
-      throw error;
-    }
+  uniqueImages = Array.from(imagesMap.values());
+  if (duplicatesCount > 0) {
+    console.log(`  ⚠️  Found ${duplicatesCount} duplicate image IDs (keeping first occurrence)`);
   }
 
-  console.log(`  ✓ Inserted total ${imageCount} images`);
+  // Insert in batches of 100 to avoid timeouts
+  const batchSize = 100;
+  for (let i = 0; i < uniqueImages.length; i += batchSize) {
+    const batch = uniqueImages.slice(i, i + batchSize);
+    const { error } = await supabase.from('images').upsert(batch, { onConflict: 'id' });
+    if (error) {
+      console.error('❌ Error inserting image batch:', error);
+      throw error;
+    }
+    console.log(`  Inserted ${Math.min(i + batchSize, uniqueImages.length)} images...`);
+  }
+
+  console.log(`  ✓ Inserted total ${uniqueImages.length} unique images`);
 
   // Step 5: Migrate existing reviews to annotations (if reviews table exists)
   console.log('\n📝 Step 5: Migrating existing reviews to annotations...');
@@ -241,7 +246,7 @@ async function main() {
   console.log('\n✅ Migration complete!\n');
   console.log('Summary:');
   console.log(`  Sites: ${sitesMap.size}`);
-  console.log(`  Images: ${imageCount}`);
+  console.log(`  Images: ${uniqueImages.length}`);
   console.log(`  Sites with geometry: ${Array.from(sitesMap.values()).filter(s => s.geometry).length}`);
   console.log('\nNext steps:');
   console.log('  1. Verify data in Supabase dashboard');

@@ -53,11 +53,12 @@ export default async function handler(req, res) {
       sites = sites.filter(site => site.images && site.images[0]?.count > 0);
     }
 
-    // Add image_count to each site
+    // Add image_count to each site and parse geometry
     sites = sites.map(site => ({
       ...site,
       image_count: site.images?.[0]?.count || 0,
-      images: undefined // Remove the nested count object
+      images: undefined, // Remove the nested count object
+      geometry: site.geometry ? (typeof site.geometry === 'string' ? JSON.parse(site.geometry) : site.geometry) : null
     }));
 
     return res.status(200).json({ sites });

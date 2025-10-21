@@ -13,8 +13,6 @@ const nextConfig = {
       },
     ],
   },
-  // Enable SWC minification
-  swcMinify: true,
   // Optimize production builds
   productionBrowserSourceMaps: false,
   // Environment variables

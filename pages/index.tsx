@@ -182,15 +182,15 @@ export default function Home() {
 
       <Layout
         leftPanel={
-          <>
-            <div className="flex-1 relative">
+          <div className="flex-1 flex flex-col relative min-h-0">
+            <div className="flex-1 relative min-h-0">
               <MapView onSiteSelect={handleSiteSelect} />
-              <ContextPane
-                siteId={selectedSiteIds[0] || null}
-                onSiteSelect={handleSiteSelect}
-              />
             </div>
-          </>
+            <ContextPane
+              siteId={selectedSiteIds[0] || null}
+              onSiteSelect={handleSiteSelect}
+            />
+          </div>
         }
         centerPanel={
           <>
@@ -222,11 +222,6 @@ export default function Home() {
               // Filters are applied via useEffect watching facets
             }} />
             <MetadataCard image={currentImage} />
-            {currentImageId && (
-              <AnnotationList 
-                annotations={annotations.filter(a => a.image_id === currentImageId)} 
-              />
-            )}
           </>
         }
       />
