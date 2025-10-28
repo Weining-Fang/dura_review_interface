@@ -39,6 +39,14 @@ This will create:
 - `vocabulary` table
 - Spatial indexes and helper functions
 
+### 2.4 Enable schematic positions storage
+
+Run the additional migration to store per-site schematic positions:
+
+```bash
+psql "$DATABASE_URL" -f sql/02_site_image_positions.sql
+```
+
 ## Step 3: Configure Environment Variables
 
 Create a `.env.local` file in the project root:

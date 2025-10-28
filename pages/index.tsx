@@ -9,7 +9,10 @@ import { useStore } from '../store/useStore';
 import Layout from '../components/Layout';
 import MapView from '../components/MapView';
 import Gallery from '../components/Gallery';
+import SiteSchematic from '../components/SiteSchematic';
 import FacetBar from '../components/FacetBar';
+import SearchBar from '../components/SearchBar';
+import SelectedImagePreview from '../components/SelectedImagePreview';
 import ContextPane from '../components/ContextPane';
 import MetadataCard from '../components/MetadataCard';
 import ComparisonStrip from '../components/ComparisonStrip';
@@ -202,7 +205,11 @@ export default function Home() {
             {/* Main view area */}
             <div className="flex-1 overflow-hidden">
               {viewMode === 'gallery' ? (
-                <Gallery images={displayImages} onImageSelect={setCurrentImageId} />
+                selectedSiteIds.length > 0 ? (
+                  <SiteSchematic siteId={selectedSiteIds[0]} images={displayImages} onImageSelect={setCurrentImageId} />
+                ) : (
+                  <Gallery images={displayImages} onImageSelect={setCurrentImageId} />
+                )
               ) : currentImageId ? (
                 <IIIFViewer imageId={currentImageId} />
               ) : (
@@ -217,12 +224,10 @@ export default function Home() {
           </>
         }
         rightPanel={
-          <>
-            <FacetBar onFilterChange={() => {
-              // Filters are applied via useEffect watching facets
-            }} />
-            <MetadataCard image={currentImage} />
-          </>
+          <div className="flex-1 flex flex-col min-h-0">
+            <SearchBar onChange={() => { /* filter reacts via facets */ }} />
+            <SelectedImagePreview />
+          </div>
         }
       />
 
