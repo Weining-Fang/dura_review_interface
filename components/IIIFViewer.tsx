@@ -12,7 +12,7 @@ interface IIIFViewerProps {
 }
 
 export default function IIIFViewer({ imageId }: IIIFViewerProps) {
-  const { images, setViewMode } = useStore();
+  const images = useStore((state) => state.images);
   const [manifest, setManifest] = useState<any>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +58,7 @@ export default function IIIFViewer({ imageId }: IIIFViewerProps) {
         if (showEditor) {
           setShowEditor(false);
         } else {
-          setViewMode('gallery');
+          useStore.getState().exitDetail();
         }
       } else if (e.key === '+' || e.key === '=') {
         e.preventDefault();
@@ -75,7 +75,8 @@ export default function IIIFViewer({ imageId }: IIIFViewerProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setViewMode, showEditor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEditor]);
 
   // Mouse drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -147,10 +148,10 @@ export default function IIIFViewer({ imageId }: IIIFViewerProps) {
       <div className="flex items-center justify-between px-4 py-2 bg-gray-800 text-white">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setViewMode('gallery')}
+            onClick={() => useStore.getState().exitDetail()}
             className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
           >
-            ← Back to Gallery
+            ← Back
           </button>
           
           <div className="text-sm text-gray-300">

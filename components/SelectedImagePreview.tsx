@@ -2,7 +2,8 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 
 export default function SelectedImagePreview() {
-  const { currentImageId, images } = useStore();
+  const currentImageId = useStore((state) => state.currentImageId);
+  const images = useStore((state) => state.images);
   const image = currentImageId ? images.find((i) => i.id === currentImageId) : null;
 
   if (!image) {

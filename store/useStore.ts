@@ -1,9 +1,10 @@
 /**
  * Global State Management with Zustand
- * Manages coordinated views: map, gallery, and facets
+ * Three-view architecture: Map, Canvas, Gallery
  */
 
 import { create } from 'zustand';
+import { PrimaryView, CanvasSettings, TagFilters } from '../types/view';
 
 export interface Site {
   id: string;
@@ -12,6 +13,7 @@ export interface Site {
   period: string[];
   image_count?: number;
   geometry?: any;
+  distance_m?: number;
 }
 
 export interface Image {
@@ -22,9 +24,11 @@ export interface Image {
   description: string;
   season?: string;
   keywords?: string[];
+  tags?: string[];
   depict_l1?: string;
   depict_l2?: string;
   annotation_count?: number;
+  photographer?: string;
 }
 
 export interface Annotation {
@@ -33,6 +37,8 @@ export interface Annotation {
   geometry: any;
   label: string;
   note?: string;
+  tags?: string[];
+  color?: string;
   confidence?: 'low' | 'medium' | 'high';
   annotator?: string;
   created_at?: string;
@@ -48,8 +54,29 @@ export interface Facets {
 
 interface AppState {
   // View state
-  viewMode: 'gallery' | 'detail';
-  setViewMode: (mode: 'gallery' | 'detail') => void;
+  primaryView: PrimaryView;
+  previousView: PrimaryView | null;
+  setPrimaryView: (view: PrimaryView) => void;
+  goToDetail: (imageId: string) => void;
+  exitDetail: () => void;
+
+  // Canvas state
+  canvasSettings: CanvasSettings;
+  updateCanvasSettings: (settings: Partial<CanvasSettings>) => void;
+  resetCanvasViewport: () => void;
+
+  // Tag filters
+  tagFilters: TagFilters;
+  setTagFilters: (update: Partial<TagFilters>) => void;
+  clearTagFilters: () => void;
+
+  // View flags
+  viewFlags: {
+    showMapSidebar: boolean;
+    showGallerySidebar: boolean;
+    showCanvasInspector: boolean;
+  };
+  setViewFlags: (update: Partial<AppState['viewFlags']>) => void;
 
   // Selection state
   selectedSiteIds: string[];
@@ -106,9 +133,37 @@ const defaultFacets: Facets = {
   searchQuery: '',
 };
 
+const defaultCanvasSettings: CanvasSettings = {
+  viewport: { zoom: 1, offset: { x: 0, y: 0 } },
+  activeTool: 'pan',
+  activeColor: '#2563eb',
+  showGrid: true,
+  showBackground: true,
+  snapToGrid: false,
+  backgroundId: null,
+};
+
+const defaultTagFilters: TagFilters = {
+  imageTags: [],
+  annotationTags: [],
+  metadata: {
+    seasons: [],
+    depict: [],
+    photographer: [],
+  },
+};
+
 export const useStore = create<AppState>((set, get) => ({
   // Initial state
-  viewMode: 'gallery',
+  primaryView: 'map',
+  previousView: null,
+  canvasSettings: defaultCanvasSettings,
+  tagFilters: defaultTagFilters,
+  viewFlags: {
+    showMapSidebar: true,
+    showGallerySidebar: true,
+    showCanvasInspector: false,
+  },
   selectedSiteIds: [],
   currentImageId: null,
   sites: [],
@@ -122,7 +177,56 @@ export const useStore = create<AppState>((set, get) => ({
   lastAnnotationLabel: null,
 
   // Actions
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setPrimaryView: (view) => set((state) => ({
+    previousView: state.primaryView,
+    primaryView: view
+  })),
+
+  goToDetail: (imageId) => {
+    set((state) => ({
+      currentImageId: imageId,
+      previousView: state.primaryView,
+      primaryView: 'detail'
+    }));
+  },
+
+  exitDetail: () => {
+    const state = get();
+    const fallbackView: PrimaryView = state.previousView || (state.selectedSiteIds.length > 0 ? 'canvas' : 'gallery');
+    set({ primaryView: fallbackView, previousView: null });
+  },
+
+  updateCanvasSettings: (settings) =>
+    set((state) => ({
+      canvasSettings: { ...state.canvasSettings, ...settings },
+    })),
+
+  resetCanvasViewport: () =>
+    set((state) => ({
+      canvasSettings: {
+        ...state.canvasSettings,
+        viewport: { zoom: 1, offset: { x: 0, y: 0 } },
+      },
+    })),
+
+  setTagFilters: (update) =>
+    set((state) => ({
+      tagFilters: {
+        ...state.tagFilters,
+        ...update,
+        metadata: {
+          ...state.tagFilters.metadata,
+          ...(update.metadata || {}),
+        },
+      },
+    })),
+
+  clearTagFilters: () => set({ tagFilters: defaultTagFilters }),
+
+  setViewFlags: (update) =>
+    set((state) => ({
+      viewFlags: { ...state.viewFlags, ...update },
+    })),
 
   setSelectedSites: (ids) => set({ selectedSiteIds: ids }),
   

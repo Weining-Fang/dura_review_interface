@@ -1,28 +1,20 @@
 /**
- * Gallery Component - Small multiples grid view
- * Displays images in uniform thumbnails with annotation badges
+ * Simplified Gallery - Uses Context instead of Zustand
  */
 
-import React, { useEffect, useState } from 'react';
-import { useStore, Image } from '../store/useStore';
+import React, { useState } from 'react';
+import { useView, useSelection, Image } from '../lib/AppContext';
 
 interface GalleryProps {
   images?: Image[];
   onImageSelect?: (imageId: string) => void;
 }
 
-export default function Gallery({ images: propImages, onImageSelect }: GalleryProps) {
-  // Use granular selectors to avoid unnecessary re-renders
-  const storeImages = useStore((state) => state.images);
-  const currentImageId = useStore((state) => state.currentImageId);
-  const setCurrentImageId = useStore((state) => state.setCurrentImageId);
-  const goToDetail = useStore((state) => state.goToDetail);
-
+export default function SimpleGallery({ images = [], onImageSelect }: GalleryProps) {
+  const { goToDetail } = useView();
+  const { selectedImageId, selectImage } = useSelection();
   const [sortBy, setSortBy] = useState<'filename' | 'season' | 'annotations'>('filename');
 
-  const images = propImages || storeImages;
-
-  // Sort images - memoize to avoid recreating on every render
   const sortedImages = React.useMemo(() => {
     return [...images].sort((a, b) => {
       switch (sortBy) {
@@ -37,61 +29,8 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
     });
   }, [images, sortBy]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!currentImageId || sortedImages.length === 0) return;
-
-      const currentIndex = sortedImages.findIndex(img => img.id === currentImageId);
-      if (currentIndex === -1) return;
-
-      let newIndex = currentIndex;
-
-      switch (e.key) {
-        case 'ArrowRight':
-        case 'ArrowDown':
-          e.preventDefault();
-          newIndex = (currentIndex + 1) % sortedImages.length;
-          break;
-        case 'ArrowLeft':
-        case 'ArrowUp':
-          e.preventDefault();
-          newIndex = currentIndex - 1;
-          if (newIndex < 0) newIndex = sortedImages.length - 1;
-          break;
-        case 'Enter':
-          e.preventDefault();
-          goToDetail(currentImageId);
-          return;
-        case ';':
-          e.preventDefault();
-          newIndex = (currentIndex + 1) % sortedImages.length;
-          break;
-        default:
-          return;
-      }
-
-      const newImageId = sortedImages[newIndex].id;
-      setCurrentImageId(newImageId);
-      if (onImageSelect) {
-        onImageSelect(newImageId);
-      }
-
-      // Scroll to image
-      const element = document.getElementById(`image-${newImageId}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-    // Zustand actions are stable, sortedImages is memoized
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentImageId, sortedImages, onImageSelect]);
-
   const handleImageClick = (imageId: string) => {
-    setCurrentImageId(imageId);
+    selectImage(imageId);
     if (onImageSelect) {
       onImageSelect(imageId);
     }
@@ -99,9 +38,6 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
 
   const handleImageDoubleClick = (imageId: string) => {
     goToDetail(imageId);
-    if (onImageSelect) {
-      onImageSelect(imageId);
-    }
   };
 
   if (images.length === 0) {
@@ -122,9 +58,11 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
         <div className="text-sm text-gray-600">
           {images.length} image{images.length !== 1 ? 's' : ''}
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <label htmlFor="sort" className="text-sm text-gray-600">Sort by:</label>
+          <label htmlFor="sort" className="text-sm text-gray-600">
+            Sort by:
+          </label>
           <select
             id="sort"
             value={sortBy}
@@ -146,7 +84,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
               key={image.id}
               id={`image-${image.id}`}
               className={`group relative bg-white rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${
-                currentImageId === image.id
+                selectedImageId === image.id
                   ? 'border-blue-500 shadow-lg'
                   : 'border-gray-200 hover:border-gray-400 hover:shadow-md'
               }`}
@@ -161,7 +99,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
                   className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                   loading="lazy"
                 />
-                
+
                 {/* Annotation badge */}
                 {image.annotation_count !== undefined && image.annotation_count > 0 && (
                   <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow">
@@ -176,9 +114,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
                   {image.description || image.filename}
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  {image.season && (
-                    <span className="text-xs text-gray-500">{image.season}</span>
-                  )}
+                  {image.season && <span className="text-xs text-gray-500">{image.season}</span>}
                   {image.depict_l1 && (
                     <span className="text-xs text-gray-400 capitalize">{image.depict_l1}</span>
                   )}
@@ -191,11 +127,9 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
 
       {/* Keyboard hints */}
       <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex gap-4">
-        <span>← → Navigate</span>
-        <span>Enter: Detail view</span>
-        <span>; Next image</span>
+        <span>Click to select</span>
+        <span>Double-click for detail view</span>
       </div>
     </div>
   );
 }
-
