@@ -12,30 +12,23 @@ interface GalleryProps {
 }
 
 export default function Gallery({ images: propImages, onImageSelect }: GalleryProps) {
-  // Use granular selectors to avoid unnecessary re-renders
-  const storeImages = useStore((state) => state.images);
-  const currentImageId = useStore((state) => state.currentImageId);
-  const setCurrentImageId = useStore((state) => state.setCurrentImageId);
-  const goToDetail = useStore((state) => state.goToDetail);
-
+  const { images: storeImages, currentImageId, setCurrentImageId, setViewMode } = useStore();
   const [sortBy, setSortBy] = useState<'filename' | 'season' | 'annotations'>('filename');
-
+  
   const images = propImages || storeImages;
 
-  // Sort images - memoize to avoid recreating on every render
-  const sortedImages = React.useMemo(() => {
-    return [...images].sort((a, b) => {
-      switch (sortBy) {
-        case 'season':
-          return (a.season || '').localeCompare(b.season || '');
-        case 'annotations':
-          return (b.annotation_count || 0) - (a.annotation_count || 0);
-        case 'filename':
-        default:
-          return (a.filename || '').localeCompare(b.filename || '');
-      }
-    });
-  }, [images, sortBy]);
+  // Sort images
+  const sortedImages = [...images].sort((a, b) => {
+    switch (sortBy) {
+      case 'season':
+        return (a.season || '').localeCompare(b.season || '');
+      case 'annotations':
+        return (b.annotation_count || 0) - (a.annotation_count || 0);
+      case 'filename':
+      default:
+        return (a.filename || '').localeCompare(b.filename || '');
+    }
+  });
 
   // Keyboard navigation
   useEffect(() => {
@@ -61,7 +54,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
           break;
         case 'Enter':
           e.preventDefault();
-          goToDetail(currentImageId);
+          setViewMode('detail');
           return;
         case ';':
           e.preventDefault();
@@ -86,9 +79,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // Zustand actions are stable, sortedImages is memoized
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentImageId, sortedImages, onImageSelect]);
+  }, [currentImageId, sortedImages, setCurrentImageId, setViewMode, onImageSelect]);
 
   const handleImageClick = (imageId: string) => {
     setCurrentImageId(imageId);
@@ -98,7 +89,8 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
   };
 
   const handleImageDoubleClick = (imageId: string) => {
-    goToDetail(imageId);
+    setCurrentImageId(imageId);
+    setViewMode('detail');
     if (onImageSelect) {
       onImageSelect(imageId);
     }

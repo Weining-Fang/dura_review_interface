@@ -1,155 +1,155 @@
 /**
- * Simplified Main Page
- * Uses Context instead of Zustand to avoid infinite loops
+ * Main Application Page - Dura-Europos Spatial Research Interface
+ * Three-panel coordinated view system with map, gallery, and facets
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
-import { useView, useData, useSelection, useSearch } from '../lib/AppContext';
-import SimpleMapView from '../components/SimpleMapView';
-import CanvasView from '../components/CanvasView';
-import SimpleGallery from '../components/SimpleGallery';
-import SimpleIIIFViewer from '../components/SimpleIIIFViewer';
+import { useStore } from '../store/useStore';
+import Layout from '../components/Layout';
+import MapView from '../components/MapView';
+import Gallery from '../components/Gallery';
+import SiteSchematic from '../components/SiteSchematic';
+import FacetBar from '../components/FacetBar';
+import SearchBar from '../components/SearchBar';
+import SelectedImagePreview from '../components/SelectedImagePreview';
+import ContextPane from '../components/ContextPane';
+import MetadataCard from '../components/MetadataCard';
+import ComparisonStrip from '../components/ComparisonStrip';
+import IIIFViewer from '../components/IIIFViewer';
+import AnnotationList from '../components/AnnotationList';
 
 export default function Home() {
-  const { view, setView, exitDetail } = useView();
-  const { sites, images, setSites, setImages, setAnnotations } = useData();
-  const { selectedSiteId, selectedImageId, selectSite, selectImage } = useSelection();
-  const { searchQuery } = useSearch();
+  const {
+    viewMode,
+    selectedSiteIds,
+    currentImageId,
+    sites,
+    images,
+    filteredImageIds,
+    facets,
+    setSites,
+    setImages,
+    setFilteredImageIds,
+    setSelectedSites,
+    setCurrentImageId
+  } = useStore();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load initial sites
+  // Load initial data
   useEffect(() => {
     setLoading(true);
+    
     fetch('/api/sites?with_images=true')
-      .then((res) => res.json())
-      .then((data) => {
+      .then(res => res.json())
+      .then(data => {
         if (data.sites) {
           setSites(data.sites);
           console.log('Loaded', data.sites.length, 'sites');
         }
       })
-      .catch((err) => {
+      .catch(err => {
         console.error('Error loading sites:', err);
         setError('Failed to load sites. Please check your database connection.');
       })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
-
-  // Load images when site is selected
-  useEffect(() => {
-    if (!selectedSiteId) {
-      setImages([]);
-      return;
-    }
-
-    fetch(`/api/sites/${selectedSiteId}/images?with_annotations=true`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.images) {
-          setImages(data.images);
-        }
-      })
-      .catch((err) => console.error('Error loading images:', err));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSiteId]); // Only re-run when site changes
-
-  // Load annotations when image is selected
-  useEffect(() => {
-    if (!selectedImageId) {
-      setAnnotations([]);
-      return;
-    }
-
-    fetch(`/api/annotations?image_id=${selectedImageId}`)
-      .then((res) => res.json())
-      .then((data) => setAnnotations(data.annotations || []))
-      .catch(() => setAnnotations([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedImageId]); // Only re-run when image changes
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [setSites]);
 
   // Handle site selection from map
   const handleSiteSelect = (siteId: string) => {
-    selectSite(siteId);
-    setView('canvas');
+    setSelectedSites([siteId]);
+    loadSiteImages(siteId);
   };
 
-  // Filter images by search
-  const filteredImages = useMemo(() => {
-    if (!searchQuery.trim()) return images;
+  // Load images for selected sites
+  const loadSiteImages = (siteId: string) => {
+    fetch(`/api/sites/${siteId}/images?with_annotations=true`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.images) {
+          setImages(data.images);
+          setFilteredImageIds(data.images.map((img: any) => img.id));
+          console.log('Loaded', data.images.length, 'images for site', siteId);
+        }
+      })
+      .catch(err => {
+        console.error('Error loading images:', err);
+      });
+  };
 
-    const query = searchQuery.toLowerCase();
-    return images.filter(
-      (img) =>
+  // Apply filters when facets change
+  useEffect(() => {
+    if (images.length === 0) return;
+
+    let filtered = [...images];
+
+    // Apply search filter
+    if (facets.searchQuery.trim()) {
+      const query = facets.searchQuery.toLowerCase();
+      filtered = filtered.filter(img =>
         (img.description || '').toLowerCase().includes(query) ||
         (img.filename || '').toLowerCase().includes(query) ||
-        (img.season || '').toLowerCase().includes(query) ||
-        (img.tags || img.keywords || []).some((tag: string) =>
-          tag.toLowerCase().includes(query)
-        )
-    );
-  }, [images, searchQuery]);
+        (img.depict_l2 || '').toLowerCase().includes(query) ||
+        (img.keywords || []).some(k => k.toLowerCase().includes(query))
+      );
+    }
 
-  // Keyboard shortcuts
+    // Apply season filter
+    if (facets.seasons.length > 0) {
+      filtered = filtered.filter(img => 
+        img.season && facets.seasons.includes(img.season)
+      );
+    }
+
+    // Apply has-annotations filter
+    if (facets.hasAnnotations) {
+      filtered = filtered.filter(img => 
+        img.annotation_count !== undefined && img.annotation_count > 0
+      );
+    }
+
+    setFilteredImageIds(filtered.map(img => img.id));
+  }, [images, facets, setFilteredImageIds]);
+
+  // Get current image for metadata display
+  const currentImage = currentImageId ? images.find(img => img.id === currentImageId) : null;
+
+  // Filter images to show in gallery
+  const displayImages = images.filter(img => filteredImageIds.includes(img.id));
+
+  // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in input
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        return;
-      }
-
-      if (e.key === 'Escape' && view === 'detail') {
-        e.preventDefault();
-        exitDetail();
-      } else if (e.key.toLowerCase() === 'm' && view !== 'detail') {
-        e.preventDefault();
-        setView('map');
-      } else if (e.key.toLowerCase() === 'c' && view !== 'detail' && selectedSiteId) {
-        e.preventDefault();
-        setView('canvas');
-      } else if (e.key.toLowerCase() === 'g' && view !== 'detail') {
-        e.preventDefault();
-        setView('gallery');
+      // Esc to clear filters/selection
+      if (e.key === 'Escape' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        if (viewMode === 'detail') {
+          // Already handled by IIIFViewer
+        } else {
+          // Clear selection
+          setSelectedSites([]);
+          setImages([]);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, selectedSiteId]); // Dispatch functions are stable, don't include them
-
-  // Render view
-  const renderView = () => {
-    if (view === 'detail' && selectedImageId) {
-      return <SimpleIIIFViewer imageId={selectedImageId} />;
-    }
-
-    if (view === 'map') {
-      return <SimpleMapView onSiteSelect={handleSiteSelect} />;
-    }
-
-    if (view === 'canvas') {
-      return <CanvasView />;
-    }
-
-    // Gallery view
-    return (
-      <SimpleGallery
-        images={filteredImages}
-        onImageSelect={(id) => selectImage(id)}
-      />
-    );
-  };
+  }, [viewMode, setSelectedSites, setImages]);
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center">
-          <p className="text-xl font-semibold text-gray-900">Loading Dura-Europos data…</p>
-          <p className="text-sm text-gray-600">Initializing spatial database and image collections</p>
+          <div className="text-xl font-semibold text-gray-900 mb-2">
+            Loading Dura-Europos Data...
+          </div>
+          <div className="text-sm text-gray-600">
+            Initializing spatial database and image collections
+          </div>
         </div>
       </div>
     );
@@ -157,10 +157,18 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="text-center max-w-md">
-          <p className="text-xl font-semibold text-red-600 mb-2">Error Loading Data</p>
-          <p className="text-sm text-gray-600 mb-4">{error}</p>
+          <div className="text-xl font-semibold text-red-600 mb-2">Error Loading Data</div>
+          <div className="text-sm text-gray-600 mb-4">{error}</div>
+          <div className="text-xs text-gray-500 bg-gray-100 p-3 rounded">
+            <p className="mb-2">Make sure you have:</p>
+            <ol className="text-left list-decimal list-inside space-y-1">
+              <li>Run the SQL setup: <code className="bg-white px-1">sql/01_setup_postgis.sql</code></li>
+              <li>Run the migration: <code className="bg-white px-1">node scripts/migrate_data.js</code></li>
+              <li>Set up environment variables in <code className="bg-white px-1">.env.local</code></li>
+            </ol>
+          </div>
         </div>
       </div>
     );
@@ -170,63 +178,70 @@ export default function Home() {
     <>
       <Head>
         <title>Dura-Europos Spatial Research Interface</title>
-        <meta
-          name="description"
-          content="Interactive spatial research interface for Dura-Europos archaeological data"
-        />
+        <meta name="description" content="Interactive spatial research interface for Dura-Europos archaeological data" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex flex-col h-screen">
-        {/* View switcher - only show if not in detail view */}
-        {view !== 'detail' && (
-          <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setView('map')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  view === 'map'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Map (M)
-              </button>
-              <button
-                onClick={() => setView('canvas')}
-                disabled={!selectedSiteId}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  view === 'canvas'
-                    ? 'bg-blue-600 text-white'
-                    : selectedSiteId
-                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                Canvas (C)
-              </button>
-              <button
-                onClick={() => setView('gallery')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  view === 'gallery'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Gallery (G)
-              </button>
+      <Layout
+        leftPanel={
+          <div className="flex-1 flex flex-col relative min-h-0">
+            <div className="flex-1 relative min-h-0">
+              <MapView onSiteSelect={handleSiteSelect} />
             </div>
-
-            <div className="text-sm text-gray-600">
-              {sites.length} sites • {images.length} images
-            </div>
+            <ContextPane
+              siteId={selectedSiteIds[0] || null}
+              onSiteSelect={handleSiteSelect}
+            />
           </div>
-        )}
+        }
+        centerPanel={
+          <>
+            {/* Comparison strip for multi-select */}
+            {selectedSiteIds.length > 1 && (
+              <ComparisonStrip siteIds={selectedSiteIds} />
+            )}
 
-        {/* Main view */}
-        <div className="flex-1 overflow-hidden">
-          {renderView()}
-        </div>
-      </div>
+            {/* Main view area */}
+            <div className="flex-1 overflow-hidden">
+              {viewMode === 'gallery' ? (
+                selectedSiteIds.length > 0 ? (
+                  <SiteSchematic siteId={selectedSiteIds[0]} images={displayImages} onImageSelect={setCurrentImageId} />
+                ) : (
+                  <Gallery images={displayImages} onImageSelect={setCurrentImageId} />
+                )
+              ) : currentImageId ? (
+                <IIIFViewer imageId={currentImageId} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <p className="text-lg mb-2">No image selected</p>
+                    <p className="text-sm">Select an image from the gallery</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        }
+        rightPanel={
+          <div className="flex-1 flex flex-col min-h-0">
+            <SearchBar onChange={() => { /* filter reacts via facets */ }} />
+            <SelectedImagePreview />
+          </div>
+        }
+      />
+
+      {/* Global styles for MapLibre */}
+      <style jsx global>{`
+        .maplibregl-popup-content {
+          padding: 0;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .maplibregl-popup-close-button {
+          display: none;
+        }
+      `}</style>
     </>
   );
 }
+

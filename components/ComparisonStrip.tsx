@@ -11,7 +11,7 @@ interface ComparisonStripProps {
 }
 
 export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
-  const sites = useStore((state) => state.sites);
+  const { sites, setCurrentImageId, setViewMode } = useStore();
   const [siteImages, setSiteImages] = useState<Record<string, Image[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -44,7 +44,8 @@ export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
   }, [siteIds]);
 
   const handleImageClick = (imageId: string) => {
-    useStore.getState().goToDetail(imageId);
+    setCurrentImageId(imageId);
+    setViewMode('detail');
   };
 
   if (siteIds.length === 0) {

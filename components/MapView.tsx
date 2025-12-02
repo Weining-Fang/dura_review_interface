@@ -27,9 +27,7 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
   const map = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const sites = useStore((state) => state.sites);
-  const selectedSiteIds = useStore((state) => state.selectedSiteIds);
-  const hoveredSiteId = useStore((state) => state.hoveredSiteId);
+  const { sites, selectedSiteIds, hoveredSiteId, setMapReady, setHoveredSiteId } = useStore();
 
   // Initialize map
   useEffect(() => {
@@ -60,9 +58,7 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
       },
       center: [40.7272, 34.7469], // Dura-Europos coordinates
       zoom: 15,
-      attributionControl: {
-        compact: true
-      }
+      attributionControl: true
     });
 
     // Add navigation controls
@@ -70,7 +66,7 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
 
     map.current.on('load', () => {
       setMapLoaded(true);
-      useStore.getState().setMapReady(true);
+      setMapReady(true);
       console.log('Map loaded successfully');
       // Ensure the map sizes correctly after initial render
       map.current && map.current.resize();
@@ -89,8 +85,7 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
         map.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setMapReady]);
 
   // Add sites layer when data is available
   useEffect(() => {
@@ -203,14 +198,14 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
         if (e.features && e.features.length > 0) {
           const siteId = e.features[0].properties?.id;
           if (siteId) {
-            useStore.getState().setHoveredSiteId(siteId);
+            setHoveredSiteId(siteId);
           }
         }
       });
 
       mapInstance.on('mouseleave', 'sites-fill', () => {
         mapInstance.getCanvas().style.cursor = '';
-        useStore.getState().setHoveredSiteId(null);
+        setHoveredSiteId(null);
       });
 
       // Add popup on hover
@@ -243,8 +238,7 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
       const source = mapInstance.getSource('sites') as maplibregl.GeoJSONSource;
       source.setData(geojson);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLoaded, sites, selectedSiteIds, onSiteSelect]);
+  }, [mapLoaded, sites, selectedSiteIds, onSiteSelect, setHoveredSiteId]);
 
   // Update outline when selection changes
   useEffect(() => {
