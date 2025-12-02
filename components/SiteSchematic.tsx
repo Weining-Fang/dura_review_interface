@@ -200,8 +200,11 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
   useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }, []);
 
   const renderNorthArrow = () => (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 text-gray-700 select-none pointer-events-none flex flex-col items-center">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div
+      className="absolute -translate-x-1/2 text-gray-700 select-none pointer-events-none flex flex-col items-center z-10"
+      style={{ left: BOARD_WIDTH / 2, top: BOARD_HEIGHT / 2 - 46 }}
+    >
+      <svg className="relative top-[2px]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3l4 7h-8l4-7z" />
       </svg>
       <div className="text-xs font-semibold">N</div>
@@ -209,7 +212,7 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
   );
 
   const renderCenterDot = () => (
-    <div className="absolute" style={{ left: BOARD_WIDTH / 2 - 3, top: BOARD_HEIGHT / 2 - 3 }}>
+    <div className="absolute z-10" style={{ left: BOARD_WIDTH / 2 - 3, top: BOARD_HEIGHT / 2 - 3 }}>
       <div className="w-1.5 h-1.5 rounded-full bg-red-600 opacity-80 pointer-events-none" />
     </div>
   );
