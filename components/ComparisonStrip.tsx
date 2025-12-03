@@ -4,19 +4,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useStore, Image } from '../store/useStore';
+import { useStore, Image, Site } from '../store/useStore';
 
 interface ComparisonStripProps {
   siteIds: string[];
 }
 
 export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
-  const {
-    sites,
-    setCurrentImageId,
-    setWorkflowStep,
-    setAnnotationOpen
-  } = useStore();
+  const { sites, setCurrentImageId, setViewMode } = useStore();
   const [siteImages, setSiteImages] = useState<Record<string, Image[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -50,8 +45,7 @@ export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
 
   const handleImageClick = (imageId: string) => {
     setCurrentImageId(imageId);
-    setWorkflowStep('annotation');
-    setAnnotationOpen(true);
+    setViewMode('detail');
   };
 
   if (siteIds.length === 0) {

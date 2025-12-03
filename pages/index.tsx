@@ -1,28 +1,30 @@
 /**
  * Main Application Page - Dura-Europos Spatial Research Interface
- * Sidebar-driven workflow from map → site schematic → annotation editor
+ * Three-panel coordinated view system with map, gallery, and facets
  */
 
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useStore } from '../store/useStore';
-import WorkflowSidebar from '../components/WorkflowSidebar';
+import Layout from '../components/Layout';
 import MapView from '../components/MapView';
+import Gallery from '../components/Gallery';
 import SiteSchematic from '../components/SiteSchematic';
+import FacetBar from '../components/FacetBar';
 import SearchBar from '../components/SearchBar';
 import SelectedImagePreview from '../components/SelectedImagePreview';
 import ContextPane from '../components/ContextPane';
+import MetadataCard from '../components/MetadataCard';
 import ComparisonStrip from '../components/ComparisonStrip';
 import IIIFViewer from '../components/IIIFViewer';
+import AnnotationList from '../components/AnnotationList';
 
 export default function Home() {
   const {
-    workflowStep,
-    setWorkflowStep,
-    isAnnotationOpen,
-    setAnnotationOpen,
+    viewMode,
     selectedSiteIds,
     currentImageId,
+    sites,
     images,
     filteredImageIds,
     facets,
@@ -60,9 +62,6 @@ export default function Home() {
   // Handle site selection from map
   const handleSiteSelect = (siteId: string) => {
     setSelectedSites([siteId]);
-    setWorkflowStep('schematic');
-    setAnnotationOpen(false);
-    setCurrentImageId(null);
     loadSiteImages(siteId);
   };
 
@@ -116,39 +115,30 @@ export default function Home() {
     setFilteredImageIds(filtered.map(img => img.id));
   }, [images, facets, setFilteredImageIds]);
 
+  // Get current image for metadata display
+  const currentImage = currentImageId ? images.find(img => img.id === currentImageId) : null;
+
+  // Filter images to show in gallery
   const displayImages = images.filter(img => filteredImageIds.includes(img.id));
-
-  const handleImageSelect = (imageId: string) => {
-    setCurrentImageId(imageId);
-    setWorkflowStep('annotation');
-    setAnnotationOpen(true);
-  };
-
-  const closeAnnotationView = () => {
-    setAnnotationOpen(false);
-    setWorkflowStep('schematic');
-  };
 
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Esc to clear filters/selection
       if (e.key === 'Escape' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        if (isAnnotationOpen) {
-          closeAnnotationView();
-          return;
+        if (viewMode === 'detail') {
+          // Already handled by IIIFViewer
+        } else {
+          // Clear selection
+          setSelectedSites([]);
+          setImages([]);
         }
-        setSelectedSites([]);
-        setImages([]);
-        setCurrentImageId(null);
-        setAnnotationOpen(false);
-        setWorkflowStep('map');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAnnotationOpen, closeAnnotationView, setSelectedSites, setImages, setCurrentImageId, setAnnotationOpen, setWorkflowStep]);
+  }, [viewMode, setSelectedSites, setImages]);
 
   if (loading) {
     return (
@@ -184,43 +174,6 @@ export default function Home() {
     );
   }
 
-  const renderMapView = () => (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 relative min-h-0">
-        <MapView onSiteSelect={handleSiteSelect} />
-      </div>
-      <ContextPane
-        siteId={selectedSiteIds[0] || null}
-        onSiteSelect={handleSiteSelect}
-      />
-    </div>
-  );
-
-  const renderSchematicView = () => {
-    if (selectedSiteIds.length === 0) {
-      return (
-        <div className="flex items-center justify-center h-full text-gray-500">
-          <div className="text-center max-w-sm">
-            <p className="text-lg mb-2 font-semibold">Select a site on the map</p>
-            <p className="text-sm">
-              Move back to the map to choose a site and unlock the schematic workspace.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <SiteSchematic
-        siteId={selectedSiteIds[0]}
-        images={displayImages}
-        onImageSelect={handleImageSelect}
-      />
-    );
-  };
-
-  const showSchematic = workflowStep === 'schematic' || workflowStep === 'annotation';
-
   return (
     <>
       <Head>
@@ -230,32 +183,53 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex h-screen bg-gray-50 text-gray-900">
-        <WorkflowSidebar />
-        <div className="flex-1 flex min-h-0">
-          <div className="flex-1 flex flex-col min-h-0">
-            {showSchematic && selectedSiteIds.length > 1 && (
+      <Layout
+        leftPanel={
+          <div className="flex-1 flex flex-col relative min-h-0">
+            <div className="flex-1 relative min-h-0">
+              <MapView onSiteSelect={handleSiteSelect} />
+            </div>
+            <ContextPane
+              siteId={selectedSiteIds[0] || null}
+              onSiteSelect={handleSiteSelect}
+            />
+          </div>
+        }
+        centerPanel={
+          <>
+            {/* Comparison strip for multi-select */}
+            {selectedSiteIds.length > 1 && (
               <ComparisonStrip siteIds={selectedSiteIds} />
             )}
-            <div className="flex-1 min-h-0 bg-white border-l border-r border-gray-200">
-              {workflowStep === 'map' ? renderMapView() : renderSchematicView()}
+
+            {/* Main view area */}
+            <div className="flex-1 overflow-hidden">
+              {viewMode === 'gallery' ? (
+                selectedSiteIds.length > 0 ? (
+                  <SiteSchematic siteId={selectedSiteIds[0]} images={displayImages} onImageSelect={setCurrentImageId} />
+                ) : (
+                  <Gallery images={displayImages} onImageSelect={setCurrentImageId} />
+                )
+              ) : currentImageId ? (
+                <IIIFViewer imageId={currentImageId} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <p className="text-lg mb-2">No image selected</p>
+                    <p className="text-sm">Select an image from the gallery</p>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-
-          <aside className="w-80 border-l border-gray-200 bg-white flex flex-col min-h-0">
-            <SearchBar onChange={() => { /* filters react via facets */ }} />
+          </>
+        }
+        rightPanel={
+          <div className="flex-1 flex flex-col min-h-0">
+            <SearchBar onChange={() => { /* filter reacts via facets */ }} />
             <SelectedImagePreview />
-          </aside>
-        </div>
-      </div>
-
-      {isAnnotationOpen && currentImageId && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="relative w-full h-full max-w-6xl max-h-[90vh] bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
-            <IIIFViewer imageId={currentImageId} onClose={closeAnnotationView} />
           </div>
-        </div>
-      )}
+        }
+      />
 
       {/* Global styles for MapLibre */}
       <style jsx global>{`

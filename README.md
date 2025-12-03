@@ -1,13 +1,12 @@
 # Dura-Europos Spatial Research Interface
 
-An interactive spatial research platform for Dura-Europos archaeological data, featuring a guided workflow that moves from the excavation map to a site schematic workspace and on to the IIIF annotation editor.
+An interactive spatial research platform for Dura-Europos archaeological data, featuring coordinated views of maps, image galleries, and structured annotations.
 
 ## Features
 
-- **Workflow Sidebar** - Step-by-step navigation (Map → Schematic → Annotation)
 - **Interactive Map** - Spatial visualization of archaeological sites with PostGIS
-- **Site Schematic Workspace** - Drag-and-drop board to arrange site imagery
-- **IIIF Viewer** - Zoom/pan image viewer with annotation modal overlay
+- **Image Gallery** - Small multiples view with faceted filtering
+- **IIIF Viewer** - Zoom/pan image viewer with annotation support
 - **Faceted Search** - Filter by building type, period, season, annotations
 - **Nearby Sites** - Spatial k-NN queries to discover adjacent structures
 - **Comparison View** - Side-by-side analysis of multiple sites
@@ -63,11 +62,11 @@ Open [http://localhost:3000](http://localhost:3000)
 ```
 dura_review_interface/
 ├── components/          # React components
-│   ├── WorkflowSidebar.tsx  # Step navigation UI
+│   ├── Layout.tsx       # Three-panel layout
 │   ├── MapView.tsx      # Interactive map with PostGIS
-│   ├── SiteSchematic.tsx# Draggable site workspace
-│   ├── SearchBar.tsx    # Filters and search entry
-│   ├── IIIFViewer.tsx   # Annotation-focused IIIF viewer
+│   ├── Gallery.tsx      # Image grid with keyboard nav
+│   ├── FacetBar.tsx     # Filters and search
+│   ├── IIIFViewer.tsx   # Image detail viewer
 │   └── ...
 ├── pages/
 │   ├── index.tsx        # Main application
@@ -90,11 +89,13 @@ dura_review_interface/
 
 ## Keyboard Shortcuts
 
-- `Esc` - Close annotation modal / reset workflow to map
+- `Arrow keys` - Navigate images in gallery
+- `Enter` - Open detail view
+- `Esc` - Back to gallery / clear selection
 - `/` - Focus search
 - `N` - Next nearby site
-- `+/-` - Zoom in/out (annotation viewer)
-- `0` - Reset zoom (annotation viewer)
+- `+/-` - Zoom in/out (detail view)
+- `0` - Reset zoom
 
 ## Contributing
 

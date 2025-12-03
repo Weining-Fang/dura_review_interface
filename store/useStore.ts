@@ -38,12 +38,6 @@ export interface Annotation {
   created_at?: string;
 }
 
-export interface AnnotationLoadState {
-  loading: boolean;
-  error: string | null;
-  lastFetched: number | null;
-}
-
 export interface Facets {
   buildingTypes: string[];
   periods: string[];
@@ -52,14 +46,10 @@ export interface Facets {
   searchQuery: string;
 }
 
-export type WorkflowStep = 'map' | 'schematic' | 'annotation';
-
 interface AppState {
-  // Workflow state
-  workflowStep: WorkflowStep;
-  setWorkflowStep: (step: WorkflowStep) => void;
-  isAnnotationOpen: boolean;
-  setAnnotationOpen: (open: boolean) => void;
+  // View state
+  viewMode: 'gallery' | 'detail';
+  setViewMode: (mode: 'gallery' | 'detail') => void;
 
   // Selection state
   selectedSiteIds: string[];
@@ -84,11 +74,6 @@ interface AppState {
 
   annotations: Annotation[];
   setAnnotations: (annotations: Annotation[]) => void;
-  annotationsByImage: Record<string, Annotation[]>;
-  annotationStatus: Record<string, AnnotationLoadState>;
-  setAnnotationsForImage: (imageId: string, annotations: Annotation[]) => void;
-  setAnnotationStatus: (imageId: string, status: AnnotationLoadState) => void;
-  clearAnnotationCache: (imageId?: string) => void;
 
   // Facets and filters
   facets: Facets;
@@ -123,16 +108,13 @@ const defaultFacets: Facets = {
 
 export const useStore = create<AppState>((set, get) => ({
   // Initial state
-  workflowStep: 'map',
-  isAnnotationOpen: false,
+  viewMode: 'gallery',
   selectedSiteIds: [],
   currentImageId: null,
   sites: [],
   images: [],
   filteredImageIds: [],
   annotations: [],
-  annotationsByImage: {},
-  annotationStatus: {},
   facets: defaultFacets,
   isMapReady: false,
   hoveredSiteId: null,
@@ -140,8 +122,7 @@ export const useStore = create<AppState>((set, get) => ({
   lastAnnotationLabel: null,
 
   // Actions
-  setWorkflowStep: (step) => set({ workflowStep: step }),
-  setAnnotationOpen: (open) => set({ isAnnotationOpen: open }),
+  setViewMode: (mode) => set({ viewMode: mode }),
 
   setSelectedSites: (ids) => set({ selectedSiteIds: ids }),
   
@@ -168,31 +149,6 @@ export const useStore = create<AppState>((set, get) => ({
   setImages: (images) => set({ images }),
   setFilteredImageIds: (ids) => set({ filteredImageIds: ids }),
   setAnnotations: (annotations) => set({ annotations }),
-  setAnnotationsForImage: (imageId, annotations) => set((state) => ({
-    annotationsByImage: {
-      ...state.annotationsByImage,
-      [imageId]: annotations
-    }
-  })),
-  setAnnotationStatus: (imageId, status) => set((state) => ({
-    annotationStatus: {
-      ...state.annotationStatus,
-      [imageId]: status
-    }
-  })),
-  clearAnnotationCache: (imageId) => set((state) => {
-    if (!imageId) {
-      return { annotationsByImage: {}, annotationStatus: {} };
-    }
-    const nextAnnotations = { ...state.annotationsByImage };
-    const nextStatus = { ...state.annotationStatus };
-    delete nextAnnotations[imageId];
-    delete nextStatus[imageId];
-    return {
-      annotationsByImage: nextAnnotations,
-      annotationStatus: nextStatus
-    };
-  }),
 
   setFacets: (newFacets) => set((state) => ({
     facets: { ...state.facets, ...newFacets }

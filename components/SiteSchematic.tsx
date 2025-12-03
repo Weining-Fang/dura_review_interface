@@ -14,7 +14,6 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<PositionsMap>({});
-  const positionsRef = useRef<PositionsMap>({});
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const [showIds, setShowIds] = useState(false);
@@ -22,21 +21,6 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
   const hasCenteredRef = useRef<string | null>(null);
   const mouseDownAbsRef = useRef<Position | null>(null);
   const lastMouseAbsRef = useRef<Position | null>(null);
-  const [isPanning, setIsPanning] = useState(false);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-  const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number; hasMoved: boolean; isActive: boolean }>({
-    startX: 0,
-    startY: 0,
-    scrollLeft: 0,
-    scrollTop: 0,
-    hasMoved: false,
-    isActive: false
-  });
-
-  // Keep positionsRef in sync with positions state
-  useEffect(() => {
-    positionsRef.current = positions;
-  }, [positions]);
 
   // Virtual board size (scrollable area)
   const BOARD_WIDTH = 4096;
@@ -66,24 +50,6 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
     c.scrollTo({ left, top });
     hasCenteredRef.current = siteId;
   }, [siteId, containerSize.width, containerSize.height]);
-
-  // Verify container can scroll horizontally
-  useEffect(() => {
-    if (!containerRef.current || !boardRef.current) return;
-    const container = containerRef.current;
-    const board = boardRef.current;
-    
-    // Ensure board is wide enough to be scrollable
-    if (board.scrollWidth < BOARD_WIDTH) {
-      board.style.width = `${BOARD_WIDTH}px`;
-    }
-    
-    // Verify horizontal scrollability
-    const canScrollHorizontal = container.scrollWidth > container.clientWidth;
-    if (!canScrollHorizontal && container.clientWidth > 0) {
-      console.warn('SiteSchematic: Container cannot scroll horizontally. Board width:', BOARD_WIDTH, 'Container width:', container.clientWidth);
-    }
-  }, [containerSize.width, containerSize.height]);
 
   // Compute auto-grid for images missing positions (around center)
   const autoGrid = useMemo(() => {
@@ -157,11 +123,6 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
   }, [BOARD_WIDTH, BOARD_HEIGHT]);
 
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (isPanning) {
-      e.preventDefault();
-      return;
-    }
     if (!containerRef.current) return;
     const containerRect = containerRef.current.getBoundingClientRect();
     const target = e.currentTarget as HTMLDivElement;
@@ -181,140 +142,43 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
     lastMouseAbsRef.current = { x: mouseX, y: mouseY };
   };
 
-  // Global mouse move handler (replaces React synthetic event)
-  useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      const currentPanRef = panRef.current;
-      const currentContainer = containerRef.current;
-      const currentDraggingId = draggingId;
-      const currentDragOffset = dragOffset;
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!draggingId || !containerRef.current) return;
+    e.preventDefault();
+    const thumbW = 64;
+    const thumbH = 64;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const mouseX = (e.clientX - containerRect.left) + containerRef.current.scrollLeft;
+    const mouseY = (e.clientY - containerRect.top) + containerRef.current.scrollTop;
+    const abs = clampToBounds({ x: mouseX - dragOffset.dx, y: mouseY - dragOffset.dy }, thumbW, thumbH);
+    const rel = absoluteToCenter(abs);
+    setPositions(prev => ({ ...prev, [draggingId]: rel }));
+    lastMouseAbsRef.current = { x: mouseX, y: mouseY };
+  };
 
-      // Check if we should start panning (mouse moved on container without dragging an image)
-      // Only start panning if mouse moves significantly to distinguish from scroll gestures
-      if (!isPanning && !currentDraggingId && currentContainer && currentPanRef.isActive) {
-        const dx = Math.abs(e.clientX - currentPanRef.startX);
-        const dy = Math.abs(e.clientY - currentPanRef.startY);
-        const MOVE_THRESHOLD = 5; // pixels - increased to better distinguish from scroll gestures
-        if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
-          setIsPanning(true);
-          currentPanRef.hasMoved = true;
-          e.preventDefault();
-        }
+  const handleMouseUp = () => {
+    if (!draggingId) return;
+    const id = draggingId;
+    setDraggingId(null);
+
+    // Determine click vs drag based on movement threshold
+    const CLICK_THRESHOLD = 5; // px mouse movement
+    const start = mouseDownAbsRef.current;
+    const last = lastMouseAbsRef.current;
+    mouseDownAbsRef.current = null;
+    lastMouseAbsRef.current = null;
+
+    if (start && last) {
+      const dx = last.x - start.x;
+      const dy = last.y - start.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= CLICK_THRESHOLD) {
+        if (onImageSelect) onImageSelect(id);
+        return; // don't save if it was just a click
       }
-
-      if (isPanning && currentContainer) {
-        e.preventDefault();
-        const dx = e.clientX - currentPanRef.startX;
-        const dy = e.clientY - currentPanRef.startY;
-        currentContainer.scrollLeft = currentPanRef.scrollLeft - dx;
-        currentContainer.scrollTop = currentPanRef.scrollTop - dy;
-        return;
-      }
-
-      if (!currentDraggingId || !currentContainer) return;
-      e.preventDefault();
-      const thumbW = 64;
-      const thumbH = 64;
-      const containerRect = currentContainer.getBoundingClientRect();
-      const mouseX = (e.clientX - containerRect.left) + currentContainer.scrollLeft;
-      const mouseY = (e.clientY - containerRect.top) + currentContainer.scrollTop;
-      const abs = clampToBounds({ x: mouseX - currentDragOffset.dx, y: mouseY - currentDragOffset.dy }, thumbW, thumbH);
-      const rel = absoluteToCenter(abs);
-      setPositions(prev => {
-        const updated = { ...prev, [currentDraggingId]: rel };
-        positionsRef.current = updated;
-        return updated;
-      });
-      lastMouseAbsRef.current = { x: mouseX, y: mouseY };
-    };
-
-    // Only attach listener when panning, dragging, or mouse is down on container
-    if (isPanning || draggingId || isMouseDown) {
-      window.addEventListener('mousemove', handleGlobalMouseMove, { passive: false });
-      return () => {
-        window.removeEventListener('mousemove', handleGlobalMouseMove);
-      };
     }
-  }, [isPanning, draggingId, isMouseDown, dragOffset, clampToBounds, absoluteToCenter]);
 
-  // Global mouse up handler (replaces React synthetic event)
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      setIsMouseDown(false);
-      if (isPanning) {
-        setIsPanning(false);
-        panRef.current = { startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0, hasMoved: false, isActive: false };
-        return;
-      }
-      if (!draggingId) {
-        // Reset pan ref if no drag was happening
-        panRef.current = { startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0, hasMoved: false, isActive: false };
-        return;
-      }
-      const id = draggingId;
-      setDraggingId(null);
-
-      const CLICK_THRESHOLD = 5;
-      const start = mouseDownAbsRef.current;
-      const last = lastMouseAbsRef.current;
-      mouseDownAbsRef.current = null;
-      lastMouseAbsRef.current = null;
-
-      if (start && last) {
-        const dx = last.x - start.x;
-        const dy = last.y - start.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist <= CLICK_THRESHOLD) {
-          if (onImageSelect) onImageSelect(id);
-          return;
-        }
-      }
-
-      // Use positionsRef to get the most current positions
-      savePositionsDebounced(positionsRef.current);
-    };
-
-    const handleMouseLeave = () => {
-      // Reset if mouse leaves window
-      setIsMouseDown(false);
-      if (isPanning) {
-        setIsPanning(false);
-        panRef.current = { startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0, hasMoved: false, isActive: false };
-      }
-      if (draggingId) {
-        setDraggingId(null);
-        savePositionsDebounced(positionsRef.current);
-      }
-    };
-
-    // Only attach listener when panning, dragging, or mouse is down on container
-    if (isPanning || draggingId || isMouseDown) {
-      window.addEventListener('mouseup', handleGlobalMouseUp);
-      window.addEventListener('mouseleave', handleMouseLeave);
-      return () => {
-        window.removeEventListener('mouseup', handleGlobalMouseUp);
-        window.removeEventListener('mouseleave', handleMouseLeave);
-      };
-    }
-  }, [isPanning, draggingId, isMouseDown, onImageSelect]);
-
-  const handleContainerMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
-    if (e.button !== 0) return; // Only handle left mouse button
-    // Don't prevent default immediately - allow native scrolling
-    // Only start panning if mouse actually moves (not a scroll gesture)
-    // Check if user is holding shift (common for horizontal scrolling) - don't start panning
-    if (e.shiftKey) return;
-    
-    setIsMouseDown(true);
-    panRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      scrollLeft: containerRef.current.scrollLeft,
-      scrollTop: containerRef.current.scrollTop,
-      hasMoved: false,
-      isActive: true
-    };
+    savePositionsDebounced(positions);
   };
 
   const savePositionsDebounced = (next: PositionsMap, immediate = false) => {
@@ -379,18 +243,15 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
       {/* Board */}
       <div
         ref={containerRef}
-        className={`flex-1 relative overflow-auto bg-white ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
-        style={{ overflowX: 'auto', overflowY: 'auto' }}
-        onMouseDown={handleContainerMouseDown}
-        onWheel={(e) => {
-          // Allow native scrolling - don't prevent default
-          // This ensures horizontal scrolling works with trackpads and mouse wheels
-        }}
+        className="flex-1 relative overflow-auto bg-white"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
       >
         <div
           ref={boardRef}
           className="relative"
-            style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT, backgroundImage: 'repeating-linear-gradient(0deg, #f7fafc, #f7fafc 24px, #edf2f7 24px, #edf2f7 25px), repeating-linear-gradient(90deg, #f7fafc, #f7fafc 24px, #edf2f7 24px, #edf2f7 25px)' }}
+          style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT, backgroundImage: 'repeating-linear-gradient(0deg, #f7fafc, #f7fafc 24px, #edf2f7 24px, #edf2f7 25px), repeating-linear-gradient(90deg, #f7fafc, #f7fafc 24px, #edf2f7 24px, #edf2f7 25px)' }}
         >
           {renderNorthArrow()}
           {renderCenterDot()}

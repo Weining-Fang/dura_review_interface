@@ -24,7 +24,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "VITEST_DISABLE_ENV_LOADER=1 vitest run",
     "migrate": "node scripts/migrate_data.js",
     "type-check": "tsc --noEmit"
   },
@@ -42,7 +41,6 @@
   "devDependencies": {
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.0",
-    "vitest": "^2.1.1"
+    "tailwindcss": "^3.4.0"
   }
 }

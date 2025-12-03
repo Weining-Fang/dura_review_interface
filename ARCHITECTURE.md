@@ -171,16 +171,17 @@ Browser downloads file
 
 ```
 pages/index.tsx (Main App)
-├── WorkflowSidebar (Map → Schematic → Annotation steps)
-├── Main Column
-│   ├── MapView + ContextPane (workflowStep === 'map')
-│   ├── ComparisonStrip (if multi-select, schematic workflow)
-│   └── SiteSchematic (draggable board)
-├── Right Panel
-│   ├── SearchBar (filters facets)
-│   └── SelectedImagePreview (metadata snapshot)
-└── Annotation Overlay
-    └── IIIFViewer (modal editor launched from schematic)
+├── Layout
+│   ├── LeftPanel (40%)
+│   │   ├── MapView (MapLibre GL)
+│   │   └── ContextPane (Nearby sites)
+│   ├── CenterPanel (flex)
+│   │   ├── ComparisonStrip (if multi-select)
+│   │   └── Gallery | IIIFViewer (based on viewMode)
+│   └── RightPanel (25%)
+│       ├── FacetBar (Filters)
+│       ├── MetadataCard (Image details)
+│       └── AnnotationList (Annotations)
 ```
 
 ## State Management (Zustand)
@@ -207,9 +208,8 @@ useStore {
   }
   filteredImageIds: string[]
   
-  // Workflow
-  workflowStep: 'map' | 'schematic' | 'annotation'
-  isAnnotationOpen: boolean
+  // View
+  viewMode: 'gallery' | 'detail'
   isMapReady: boolean
   
   // Context
@@ -219,7 +219,7 @@ useStore {
   // Actions
   setSelectedSites(), toggleSite()
   setFacets(), addFacetValue(), removeFacetValue()
-  setWorkflowStep(), setAnnotationOpen(), setCurrentImageId()
+  setViewMode(), setCurrentImageId()
   ...
 }
 ```
