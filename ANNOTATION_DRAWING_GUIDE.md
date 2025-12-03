@@ -154,6 +154,14 @@ Typical annotation workflow:
 12. Annotations now visible in viewer and saved to database
 ```
 
+## QA Checklist (manual)
+
+1. Open the IIIF viewer for an image and ensure the annotation sidebar loads without errors.
+2. Draw two new annotations, populate labels/notes, then click **Save All**. Both drafts should flip to a `clean` badge and remain visible after closing/reopening the editor.
+3. Select an existing annotation, change its label, queue a delete for another, and run **Save All** again. The updated annotation should persist while the deleted one disappears after refresh.
+4. Close the editor, verify the main viewer list refreshes automatically, then reload the page to confirm cached annotations hydrate without warning banners.
+5. From the sidebar, trigger a delete via the ✕ icon and confirm that the entry is tagged "delete queued" until the next save cycle.
+
 ## Troubleshooting
 
 ### Shapes not appearing

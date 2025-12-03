@@ -8,15 +8,33 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase environment variables:', {
+    hasUrl: !!supabaseUrl,
+    hasServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
+    hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  });
+}
+
+const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  if (!supabase) {
+    console.error('Supabase client not initialized');
+    return res.status(500).json({ 
+      error: 'Database not configured',
+      message: 'Missing Supabase environment variables. Please check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    });
   }
 
   try {
@@ -63,8 +81,16 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ sites });
   } catch (error) {
-    console.error('Unexpected error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Unexpected error fetching sites:', {
+      message: error.message,
+      details: error.toString(),
+      stack: error.stack
+    });
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message || 'Unknown error occurred',
+      details: process.env.NODE_ENV === 'development' ? error.toString() : undefined
+    });
   }
 }
 
