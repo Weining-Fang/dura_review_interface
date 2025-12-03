@@ -58,7 +58,7 @@ export default function MapView({ onSiteSelect }: MapViewProps) {
       },
       center: [40.7272, 34.7469], // Dura-Europos coordinates
       zoom: 15,
-      attributionControl: true
+      attributionControl: { compact: true }
     });
 
     // Add navigation controls

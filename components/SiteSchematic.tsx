@@ -5,12 +5,13 @@ interface SiteSchematicProps {
   siteId: string;
   images: Image[];
   onImageSelect?: (imageId: string) => void;
+  onImageOpen?: (imageId: string) => void;
 }
 
 type Position = { x: number; y: number };
 type PositionsMap = Record<string, Position>;
 
-export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSchematicProps) {
+export default function SiteSchematic({ siteId, images, onImageSelect, onImageOpen }: SiteSchematicProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<PositionsMap>({});
@@ -275,7 +276,12 @@ export default function SiteSchematic({ siteId, images, onImageSelect }: SiteSch
               border: '2px solid #e5e7eb'
             };
             return (
-              <div key={img.id} style={style} onMouseDown={(e) => handleMouseDown(e, img.id)} onDoubleClick={() => onImageSelect && onImageSelect(img.id)}>
+              <div
+                key={img.id}
+                style={style}
+                onMouseDown={(e) => handleMouseDown(e, img.id)}
+                onDoubleClick={() => onImageOpen && onImageOpen(img.id)}
+              >
                 <img
                   src={img.url}
                   alt={img.description || img.filename}

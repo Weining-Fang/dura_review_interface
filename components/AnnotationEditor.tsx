@@ -6,28 +6,20 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import {
+  createEllipseFromPoints,
+  createRectFromPoints,
+  deserializeGeometry,
+  DragPoint,
+  EllipseGeom,
+  NormalizedShape,
+  RectGeom,
+  serializeShapeGeometry
+} from '../utils/annotations/geometry';
 
-interface Shape {
-  id: string;
-  type: 'rect' | 'ellipse';
-  geom: RectGeom | EllipseGeom;
-  label: number;
+interface Shape extends NormalizedShape {
   svgEl?: SVGElement;
   labelEl?: SVGTextElement;
-}
-
-interface RectGeom {
-  x: number;  // normalized 0-1
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface EllipseGeom {
-  cx: number;  // normalized 0-1
-  cy: number;
-  rx: number;
-  ry: number;
 }
 
 interface AnnotationEditorProps {
@@ -52,7 +44,7 @@ export default function AnnotationEditor({
   const [currentTool, setCurrentTool] = useState<'rect' | 'ellipse'>('rect');
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [tempShape, setTempShape] = useState<any>(null);
+  const [dragStart, setDragStart] = useState<DragPoint | null>(null);
   const [selectedShape, setSelectedShape] = useState<Shape | null>(null);
   const [labelCounter, setLabelCounter] = useState(1);
   const [dragState, setDragState] = useState<any>(null);
@@ -65,20 +57,11 @@ export default function AnnotationEditor({
   // Load existing annotations
   useEffect(() => {
     if (existingAnnotations.length > 0) {
-      const loadedShapes = existingAnnotations.map((annot, idx) => {
-        const geom = typeof annot.geometry === 'string' 
-          ? JSON.parse(annot.geometry) 
-          : annot.geometry;
-        
-        return {
-          id: annot.id || `shape_${idx}`,
-          type: geom.type || 'rect',
-          geom: geom.type === 'rect' 
-            ? { x: geom.x, y: geom.y, w: geom.w, h: geom.h }
-            : { cx: geom.cx, cy: geom.cy, rx: geom.rx, ry: geom.ry },
-          label: geom.label || idx + 1
-        };
-      });
+      const loadedShapes = existingAnnotations.map((annot, idx) =>
+        ({
+          ...deserializeGeometry(annot.geometry, annot.id || `shape_${idx}`, idx + 1)
+        } as Shape)
+      );
       setShapes(loadedShapes);
       setLabelCounter(loadedShapes.length + 1);
     }
@@ -94,6 +77,17 @@ export default function AnnotationEditor({
     if (!overlayRef.current) return { width: 0, height: 0 };
     const rect = overlayRef.current.getBoundingClientRect();
     return { width: rect.width, height: rect.height };
+  };
+
+  const getNormalizedPoint = (clientX: number, clientY: number): DragPoint | null => {
+    if (!overlayRef.current) return null;
+    const rect = overlayRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    return {
+      x: (clientX - rect.left) / rect.width,
+      y: (clientY - rect.top) / rect.height
+    };
   };
 
   const positionOverlay = () => {
@@ -198,60 +192,51 @@ export default function AnnotationEditor({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!overlayRef.current) return;
-    
-    const rect = overlayRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
+    const point = getNormalizedPoint(e.clientX, e.clientY);
+    if (!point) return;
 
     setIsDrawing(true);
-    setTempShape({ startX: x, startY: y });
+    setDragStart(point);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDrawing || !tempShape || !overlayRef.current) return;
+    if (!isDrawing || !dragStart || !overlayRef.current) return;
 
-    const rect = overlayRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
+    const current = getNormalizedPoint(e.clientX, e.clientY);
+    if (!current) return;
 
-    // Draw temporary shape
     const overlay = overlayRef.current;
     const tempElements = overlay.querySelectorAll('.temp-shape');
-    tempElements.forEach(el => el.remove());
+    tempElements.forEach((el) => el.remove());
 
+    const rect = overlay.getBoundingClientRect();
     const r = { width: rect.width, height: rect.height };
 
     if (currentTool === 'rect') {
-      const x1 = Math.min(tempShape.startX, x);
-      const y1 = Math.min(tempShape.startY, y);
-      const w = Math.abs(x - tempShape.startX);
-      const h = Math.abs(y - tempShape.startY);
+      const geom = createRectFromPoints(dragStart, current, false);
+      if (!geom) return;
 
       const tempRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       tempRect.classList.add('temp-shape');
-      tempRect.setAttribute('x', String(x1 * r.width));
-      tempRect.setAttribute('y', String(y1 * r.height));
-      tempRect.setAttribute('width', String(w * r.width));
-      tempRect.setAttribute('height', String(h * r.height));
+      tempRect.setAttribute('x', String(geom.x * r.width));
+      tempRect.setAttribute('y', String(geom.y * r.height));
+      tempRect.setAttribute('width', String(geom.w * r.width));
+      tempRect.setAttribute('height', String(geom.h * r.height));
       tempRect.setAttribute('fill', 'none');
       tempRect.setAttribute('stroke', '#3b82f6');
       tempRect.setAttribute('stroke-width', '2');
       tempRect.setAttribute('stroke-dasharray', '5,5');
       overlay.appendChild(tempRect);
-
     } else {
-      const cx = (tempShape.startX + x) / 2;
-      const cy = (tempShape.startY + y) / 2;
-      const rx = Math.abs(x - tempShape.startX) / 2;
-      const ry = Math.abs(y - tempShape.startY) / 2;
+      const geom = createEllipseFromPoints(dragStart, current, false);
+      if (!geom) return;
 
       const tempEllipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
       tempEllipse.classList.add('temp-shape');
-      tempEllipse.setAttribute('cx', String(cx * r.width));
-      tempEllipse.setAttribute('cy', String(cy * r.height));
-      tempEllipse.setAttribute('rx', String(rx * r.width));
-      tempEllipse.setAttribute('ry', String(ry * r.height));
+      tempEllipse.setAttribute('cx', String(geom.cx * r.width));
+      tempEllipse.setAttribute('cy', String(geom.cy * r.height));
+      tempEllipse.setAttribute('rx', String(geom.rx * r.width));
+      tempEllipse.setAttribute('ry', String(geom.ry * r.height));
       tempEllipse.setAttribute('fill', 'none');
       tempEllipse.setAttribute('stroke', '#3b82f6');
       tempEllipse.setAttribute('stroke-width', '2');
@@ -261,47 +246,31 @@ export default function AnnotationEditor({
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDrawing || !tempShape || !overlayRef.current) return;
+    if (!isDrawing || !dragStart || !overlayRef.current) return;
 
-    const rect = overlayRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
+    const current = getNormalizedPoint(e.clientX, e.clientY);
+    const overlay = overlayRef.current;
 
-    // Remove temp shape
-    const tempElements = overlayRef.current.querySelectorAll('.temp-shape');
-    tempElements.forEach(el => el.remove());
+    if (!current || !overlay) {
+      setIsDrawing(false);
+      setDragStart(null);
+      return;
+    }
 
-    // Create final shape
-    let geom: RectGeom | EllipseGeom;
+    const tempElements = overlay.querySelectorAll('.temp-shape');
+    tempElements.forEach((el) => el.remove());
 
+    let geom: RectGeom | EllipseGeom | null = null;
     if (currentTool === 'rect') {
-      const x1 = Math.min(tempShape.startX, x);
-      const y1 = Math.min(tempShape.startY, y);
-      const w = Math.abs(x - tempShape.startX);
-      const h = Math.abs(y - tempShape.startY);
-      
-      // Only create if minimum size
-      if (w < 0.01 || h < 0.01) {
-        setIsDrawing(false);
-        setTempShape(null);
-        return;
-      }
-
-      geom = { x: x1, y: y1, w, h };
+      geom = createRectFromPoints(dragStart, current, true);
     } else {
-      const cx = (tempShape.startX + x) / 2;
-      const cy = (tempShape.startY + y) / 2;
-      const rx = Math.abs(x - tempShape.startX) / 2;
-      const ry = Math.abs(y - tempShape.startY) / 2;
+      geom = createEllipseFromPoints(dragStart, current, true);
+    }
 
-      // Only create if minimum size
-      if (rx < 0.01 || ry < 0.01) {
-        setIsDrawing(false);
-        setTempShape(null);
-        return;
-      }
-
-      geom = { cx, cy, rx, ry };
+    if (!geom) {
+      setIsDrawing(false);
+      setDragStart(null);
+      return;
     }
 
     const newShape: Shape = {
@@ -311,11 +280,11 @@ export default function AnnotationEditor({
       label: labelCounter
     };
 
-    setShapes([...shapes, newShape]);
-    setLabelCounter(labelCounter + 1);
+    setShapes((prev) => [...prev, newShape]);
+    setLabelCounter((count) => count + 1);
     setSelectedShape(newShape);
     setIsDrawing(false);
-    setTempShape(null);
+    setDragStart(null);
   };
 
   const handleClear = () => {
@@ -347,11 +316,7 @@ export default function AnnotationEditor({
     try {
       const annotation = {
         image_id: imageId,
-        geometry: {
-          type: selectedShape.type,
-          ...selectedShape.geom,
-          label: selectedShape.label
-        },
+        geometry: serializeShapeGeometry(selectedShape),
         label: annotationLabel,
         note: annotationNote,
         confidence: annotationConfidence,

@@ -4,14 +4,14 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useStore, Image, Site } from '../store/useStore';
+import { useStore, Image } from '../store/useStore';
 
 interface ComparisonStripProps {
   siteIds: string[];
 }
 
 export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
-  const { sites, setCurrentImageId, setViewMode } = useStore();
+  const { sites, setCurrentImageId, openAnnotationModal } = useStore();
   const [siteImages, setSiteImages] = useState<Record<string, Image[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +45,7 @@ export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
 
   const handleImageClick = (imageId: string) => {
     setCurrentImageId(imageId);
-    setViewMode('detail');
+    openAnnotationModal(imageId);
   };
 
   if (siteIds.length === 0) {

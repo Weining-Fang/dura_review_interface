@@ -6,22 +6,20 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useStore } from '../store/useStore';
-import Layout from '../components/Layout';
 import MapView from '../components/MapView';
 import Gallery from '../components/Gallery';
 import SiteSchematic from '../components/SiteSchematic';
-import FacetBar from '../components/FacetBar';
 import SearchBar from '../components/SearchBar';
 import SelectedImagePreview from '../components/SelectedImagePreview';
 import ContextPane from '../components/ContextPane';
-import MetadataCard from '../components/MetadataCard';
 import ComparisonStrip from '../components/ComparisonStrip';
-import IIIFViewer from '../components/IIIFViewer';
-import AnnotationList from '../components/AnnotationList';
+import MetadataImageViewer from '../components/MetadataImageViewer';
+import AnnotationModal from '../components/AnnotationModal';
 
 export default function Home() {
   const {
     viewMode,
+    appStage,
     selectedSiteIds,
     currentImageId,
     sites,
@@ -32,7 +30,9 @@ export default function Home() {
     setImages,
     setFilteredImageIds,
     setSelectedSites,
-    setCurrentImageId
+    setCurrentImageId,
+    setAppStage,
+    openAnnotationModal
   } = useStore();
 
   const [loading, setLoading] = useState(true);
@@ -63,6 +63,7 @@ export default function Home() {
   const handleSiteSelect = (siteId: string) => {
     setSelectedSites([siteId]);
     loadSiteImages(siteId);
+    setAppStage('images');
   };
 
   // Load images for selected sites
@@ -121,13 +122,18 @@ export default function Home() {
   // Filter images to show in gallery
   const displayImages = images.filter(img => filteredImageIds.includes(img.id));
 
+  // Handle back from metadata view
+  const handleBackFromMetadata = () => {
+    setAppStage('images');
+  };
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Esc to clear filters/selection
+      // Esc to clear filters/selection or go back
       if (e.key === 'Escape' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        if (viewMode === 'detail') {
-          // Already handled by IIIFViewer
+        if (appStage === 'metadata') {
+          setAppStage('images');
         } else {
           // Clear selection
           setSelectedSites([]);
@@ -138,7 +144,7 @@ export default function Home() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, setSelectedSites, setImages]);
+  }, [appStage, viewMode, setSelectedSites, setImages, setAppStage]);
 
   if (loading) {
     return (
@@ -183,8 +189,8 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <Layout
-        leftPanel={
+      {appStage === 'spatial' && (
+        <div className="flex h-screen w-screen overflow-hidden bg-gray-50">
           <div className="flex-1 flex flex-col relative min-h-0">
             <div className="flex-1 relative min-h-0">
               <MapView onSiteSelect={handleSiteSelect} />
@@ -194,42 +200,56 @@ export default function Home() {
               onSiteSelect={handleSiteSelect}
             />
           </div>
-        }
-        centerPanel={
-          <>
-            {/* Comparison strip for multi-select */}
+        </div>
+      )}
+
+      {appStage === 'images' && (
+        <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
+            <button
+              onClick={() => setAppStage('spatial')}
+              className="px-3 py-1 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              ← Back to map
+            </button>
+            <SearchBar onChange={() => { /* filter reacts via facets */ }} />
+          </div>
+          <div className="flex-1 flex flex-col min-h-0">
             {selectedSiteIds.length > 1 && (
               <ComparisonStrip siteIds={selectedSiteIds} />
             )}
-
-            {/* Main view area */}
             <div className="flex-1 overflow-hidden">
-              {viewMode === 'gallery' ? (
-                selectedSiteIds.length > 0 ? (
-                  <SiteSchematic siteId={selectedSiteIds[0]} images={displayImages} onImageSelect={setCurrentImageId} />
-                ) : (
-                  <Gallery images={displayImages} onImageSelect={setCurrentImageId} />
-                )
-              ) : currentImageId ? (
-                <IIIFViewer imageId={currentImageId} />
+              {selectedSiteIds.length > 0 ? (
+                <SiteSchematic
+                  siteId={selectedSiteIds[0]}
+                  images={displayImages}
+                  onImageSelect={setCurrentImageId}
+                  onImageOpen={openAnnotationModal}
+                />
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <p className="text-lg mb-2">No image selected</p>
-                    <p className="text-sm">Select an image from the gallery</p>
-                  </div>
-                </div>
+                <Gallery images={displayImages} onImageSelect={setCurrentImageId} />
               )}
             </div>
-          </>
-        }
-        rightPanel={
-          <div className="flex-1 flex flex-col min-h-0">
-            <SearchBar onChange={() => { /* filter reacts via facets */ }} />
-            <SelectedImagePreview />
+            <div className="border-t border-gray-200 bg-white">
+              <SelectedImagePreview />
+            </div>
           </div>
-        }
-      />
+        </div>
+      )}
+
+      <AnnotationModal />
+
+      {appStage === 'metadata' && (
+        <div className="h-screen w-screen overflow-hidden bg-black">
+          {currentImage ? (
+            <MetadataImageViewer image={currentImage} onBack={handleBackFromMetadata} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-white">
+              Select an image from the gallery to view
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Global styles for MapLibre */}
       <style jsx global>{`
