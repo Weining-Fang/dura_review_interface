@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { useStore, Image } from '../store/useStore';
 
 interface ComparisonStripProps {
@@ -11,7 +12,8 @@ interface ComparisonStripProps {
 }
 
 export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
-  const { sites, setCurrentImageId, openAnnotationModal } = useStore();
+  const router = useRouter();
+  const { sites, setCurrentImageId } = useStore();
   const [siteImages, setSiteImages] = useState<Record<string, Image[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +47,7 @@ export default function ComparisonStrip({ siteIds }: ComparisonStripProps) {
 
   const handleImageClick = (imageId: string) => {
     setCurrentImageId(imageId);
-    openAnnotationModal(imageId);
+    void router.push('/review');
   };
 
   if (siteIds.length === 0) {

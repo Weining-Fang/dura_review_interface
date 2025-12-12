@@ -28,17 +28,6 @@ export interface Image {
   annotation_count?: number;
 }
 
-export interface Annotation {
-  id: string;
-  image_id: string;
-  geometry: any;
-  label: string;
-  note?: string;
-  confidence?: 'low' | 'medium' | 'high';
-  annotator?: string;
-  created_at?: string;
-}
-
 export interface Facets {
   buildingTypes: string[];
   periods: string[];
@@ -73,9 +62,6 @@ interface AppState {
   filteredImageIds: string[];
   setFilteredImageIds: (ids: string[]) => void;
 
-  annotations: Annotation[];
-  setAnnotations: (annotations: Annotation[]) => void;
-
   // Facets and filters
   facets: Facets;
   setFacets: (facets: Partial<Facets>) => void;
@@ -97,11 +83,6 @@ interface AppState {
   // Last annotation label (for "repeat last" shortcut)
   lastAnnotationLabel: string | null;
   setLastAnnotationLabel: (label: string | null) => void;
-
-  // Annotation modal
-  annotationModalImageId: string | null;
-  openAnnotationModal: (imageId: string) => void;
-  closeAnnotationModal: () => void;
 }
 
 const defaultFacets: Facets = {
@@ -120,13 +101,11 @@ export const useStore = create<AppState>((set, get) => ({
   sites: [],
   images: [],
   filteredImageIds: [],
-  annotations: [],
   facets: defaultFacets,
   isMapReady: false,
   hoveredSiteId: null,
   nearbySites: [],
   lastAnnotationLabel: null,
-  annotationModalImageId: null,
 
   // Actions
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -155,7 +134,6 @@ export const useStore = create<AppState>((set, get) => ({
   setSites: (sites) => set({ sites }),
   setImages: (images) => set({ images }),
   setFilteredImageIds: (ids) => set({ filteredImageIds: ids }),
-  setAnnotations: (annotations) => set({ annotations }),
 
   setFacets: (newFacets) => set((state) => ({
     facets: { ...state.facets, ...newFacets }
@@ -219,8 +197,5 @@ export const useStore = create<AppState>((set, get) => ({
   setHoveredSiteId: (id) => set({ hoveredSiteId: id }),
   setNearbySites: (sites) => set({ nearbySites: sites }),
   setLastAnnotationLabel: (label) => set({ lastAnnotationLabel: label }),
-
-  openAnnotationModal: (imageId) => set({ annotationModalImageId: imageId }),
-  closeAnnotationModal: () => set({ annotationModalImageId: null }),
 }));
 

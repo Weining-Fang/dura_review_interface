@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useStore, Annotation } from '../store/useStore';
+import { useStore } from '../store/useStore';
 import AnnotationEditor from './AnnotationEditor';
 
 interface IIIFViewerProps {
@@ -14,7 +14,7 @@ interface IIIFViewerProps {
 export default function IIIFViewer({ imageId }: IIIFViewerProps) {
   const { images, setViewMode } = useStore();
   const [manifest, setManifest] = useState<any>(null);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annotations, setAnnotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [zoom, setZoom] = useState(1);
