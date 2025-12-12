@@ -1,3 +1,5 @@
+.env.local
+
 .vercel
 # dependencies
 node_modules/
