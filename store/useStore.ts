@@ -21,6 +21,7 @@ export interface Image {
   filename: string;
   description: string;
   season?: string;
+  photographer?: string;
   keywords?: string[];
   depict_l1?: string;
   depict_l2?: string;
