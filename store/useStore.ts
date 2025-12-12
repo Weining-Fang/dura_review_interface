@@ -21,7 +21,6 @@ export interface Image {
   filename: string;
   description: string;
   season?: string;
-  photographer?: string;
   keywords?: string[];
   depict_l1?: string;
   depict_l2?: string;
@@ -47,16 +46,10 @@ export interface Facets {
   searchQuery: string;
 }
 
-type AppStage = 'spatial' | 'images' | 'metadata';
-
 interface AppState {
   // View state
   viewMode: 'gallery' | 'detail';
   setViewMode: (mode: 'gallery' | 'detail') => void;
-
-  // High-level app stage (which facet is shown)
-  appStage: AppStage;
-  setAppStage: (stage: AppStage) => void;
 
   // Selection state
   selectedSiteIds: string[];
@@ -104,7 +97,7 @@ interface AppState {
   lastAnnotationLabel: string | null;
   setLastAnnotationLabel: (label: string | null) => void;
 
-  // Annotation modal state
+  // Annotation modal
   annotationModalImageId: string | null;
   openAnnotationModal: (imageId: string) => void;
   closeAnnotationModal: () => void;
@@ -121,7 +114,6 @@ const defaultFacets: Facets = {
 export const useStore = create<AppState>((set, get) => ({
   // Initial state
   viewMode: 'gallery',
-  appStage: 'spatial',
   selectedSiteIds: [],
   currentImageId: null,
   sites: [],
@@ -137,8 +129,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   // Actions
   setViewMode: (mode) => set({ viewMode: mode }),
-
-  setAppStage: (stage) => set({ appStage: stage }),
 
   setSelectedSites: (ids) => set({ selectedSiteIds: ids }),
   
@@ -229,13 +219,7 @@ export const useStore = create<AppState>((set, get) => ({
   setNearbySites: (sites) => set({ nearbySites: sites }),
   setLastAnnotationLabel: (label) => set({ lastAnnotationLabel: label }),
 
-  openAnnotationModal: (imageId) =>
-    set({
-      annotationModalImageId: imageId,
-      currentImageId: imageId,
-      viewMode: 'detail'
-    }),
-
+  openAnnotationModal: (imageId) => set({ annotationModalImageId: imageId }),
   closeAnnotationModal: () => set({ annotationModalImageId: null }),
 }));
 

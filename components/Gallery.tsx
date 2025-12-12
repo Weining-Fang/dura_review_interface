@@ -12,12 +12,7 @@ interface GalleryProps {
 }
 
 export default function Gallery({ images: propImages, onImageSelect }: GalleryProps) {
-  const {
-    images: storeImages,
-    currentImageId,
-    setCurrentImageId,
-    openAnnotationModal
-  } = useStore();
+  const { images: storeImages, currentImageId, setCurrentImageId, setViewMode } = useStore();
   const [sortBy, setSortBy] = useState<'filename' | 'season' | 'annotations'>('filename');
   
   const images = propImages || storeImages;
@@ -59,9 +54,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
           break;
         case 'Enter':
           e.preventDefault();
-          if (currentImageId) {
-            openAnnotationModal(currentImageId);
-          }
+          setViewMode('detail');
           return;
         case ';':
           e.preventDefault();
@@ -86,7 +79,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentImageId, sortedImages, setCurrentImageId, onImageSelect, openAnnotationModal]);
+  }, [currentImageId, sortedImages, setCurrentImageId, setViewMode, onImageSelect]);
 
   const handleImageClick = (imageId: string) => {
     setCurrentImageId(imageId);
@@ -97,7 +90,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
 
   const handleImageDoubleClick = (imageId: string) => {
     setCurrentImageId(imageId);
-    openAnnotationModal(imageId);
+    setViewMode('detail');
     if (onImageSelect) {
       onImageSelect(imageId);
     }
@@ -191,7 +184,7 @@ export default function Gallery({ images: propImages, onImageSelect }: GalleryPr
       {/* Keyboard hints */}
       <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex gap-4">
         <span>← → Navigate</span>
-        <span>Enter: Open modal</span>
+        <span>Enter: Detail view</span>
         <span>; Next image</span>
       </div>
     </div>

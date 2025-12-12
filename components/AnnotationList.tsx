@@ -29,54 +29,79 @@ export default function AnnotationList({ annotations, onAnnotationClick }: Annot
       </h3>
 
       <div className="space-y-2 max-h-64 overflow-y-auto">
-        {annotations.map((annotation) => (
-          <div
-            key={annotation.id}
-            className={`p-2 rounded-lg border border-gray-200 bg-gray-50 ${
-              onAnnotationClick ? 'cursor-pointer hover:bg-gray-100' : ''
-            }`}
-            onClick={() => onAnnotationClick?.(annotation)}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">
-                  {annotation.label}
-                </div>
-                {annotation.note && (
-                  <div className="text-xs text-gray-600 mt-1">
-                    {annotation.note}
+        {annotations.map((annotation) => {
+          let color: string | undefined;
+          if (annotation.geometry) {
+            if (typeof annotation.geometry === 'string') {
+              try {
+                const parsed = JSON.parse(annotation.geometry);
+                color = parsed?.color;
+              } catch {
+                color = undefined;
+              }
+            } else {
+              color = (annotation.geometry as any)?.color;
+            }
+          }
+
+          return (
+            <div
+              key={annotation.id}
+              className={`p-2 rounded-lg border border-gray-200 bg-gray-50 ${
+                onAnnotationClick ? 'cursor-pointer hover:bg-gray-100' : ''
+              }`}
+              onClick={() => onAnnotationClick?.(annotation)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    {color && (
+                      <span
+                        className="inline-block w-3 h-3 rounded-full border border-white shadow"
+                        style={{ backgroundColor: color }}
+                        aria-hidden
+                      />
+                    )}
+                    <div className="text-sm font-medium text-gray-900">
+                      {annotation.label}
+                    </div>
                   </div>
+                  {annotation.note && (
+                    <div className="text-xs text-gray-600 mt-1">
+                      {annotation.note}
+                    </div>
+                  )}
+                </div>
+
+                {annotation.confidence && (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      annotation.confidence === 'high'
+                        ? 'bg-green-100 text-green-800'
+                        : annotation.confidence === 'medium'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {annotation.confidence}
+                  </span>
                 )}
               </div>
 
-              {annotation.confidence && (
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full ${
-                    annotation.confidence === 'high'
-                      ? 'bg-green-100 text-green-800'
-                      : annotation.confidence === 'medium'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {annotation.confidence}
-                </span>
+              {annotation.annotator && (
+                <div className="text-xs text-gray-400 mt-1">
+                  by {annotation.annotator}
+                </div>
+              )}
+
+              {annotation.created_at && (
+                <div className="text-xs text-gray-400">
+                  {new Date(annotation.created_at).toLocaleDateString()}
+                </div>
               )}
             </div>
-
-            {annotation.annotator && (
-              <div className="text-xs text-gray-400 mt-1">
-                by {annotation.annotator}
-              </div>
-            )}
-
-            {annotation.created_at && (
-              <div className="text-xs text-gray-400">
-                {new Date(annotation.created_at).toLocaleDateString()}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

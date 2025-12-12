@@ -28,6 +28,9 @@ interface AnnotationEditorProps {
   onSave?: (annotations: any[]) => void;
   onClose?: () => void;
   existingAnnotations?: any[];
+  initialTool?: 'rect' | 'ellipse';
+  initialColor?: string;
+  onColorChange?: (color: string) => void;
 }
 
 export default function AnnotationEditor({
@@ -35,13 +38,17 @@ export default function AnnotationEditor({
   imageId,
   onSave,
   onClose,
-  existingAnnotations = []
+  existingAnnotations = [],
+  initialTool = 'rect',
+  initialColor = '#ef4444',
+  onColorChange
 }: AnnotationEditorProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [currentTool, setCurrentTool] = useState<'rect' | 'ellipse'>('rect');
+  const [currentTool, setCurrentTool] = useState<'rect' | 'ellipse'>(initialTool);
+  const [currentColor, setCurrentColor] = useState<string>(initialColor);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [dragStart, setDragStart] = useState<DragPoint | null>(null);
@@ -66,6 +73,15 @@ export default function AnnotationEditor({
       setLabelCounter(loadedShapes.length + 1);
     }
   }, [existingAnnotations]);
+
+  // React to external tool/color defaults
+  useEffect(() => {
+    setCurrentTool(initialTool);
+  }, [initialTool]);
+
+  useEffect(() => {
+    setCurrentColor(initialColor);
+  }, [initialColor]);
 
   // Redraw shapes when they change
   useEffect(() => {
@@ -124,8 +140,11 @@ export default function AnnotationEditor({
         rect.setAttribute('width', String(geom.w * r.width));
         rect.setAttribute('height', String(geom.h * r.height));
         rect.setAttribute('fill', 'none');
-        rect.setAttribute('stroke', selectedShape?.id === shape.id ? '#3b82f6' : '#ef4444');
+        rect.setAttribute('stroke', shape.color || '#ef4444');
         rect.setAttribute('stroke-width', selectedShape?.id === shape.id ? '3' : '2');
+        if (selectedShape?.id === shape.id) {
+          rect.setAttribute('opacity', '0.95');
+        }
         rect.style.cursor = 'pointer';
         rect.addEventListener('click', () => handleShapeClick(shape));
         overlay.appendChild(rect);
@@ -136,7 +155,7 @@ export default function AnnotationEditor({
         label.setAttribute('y', String(geom.y * r.height + (geom.h * r.height) / 2));
         label.setAttribute('text-anchor', 'middle');
         label.setAttribute('dominant-baseline', 'middle');
-        label.setAttribute('fill', '#ef4444');
+        label.setAttribute('fill', shape.color || '#ef4444');
         label.setAttribute('font-size', '16');
         label.setAttribute('font-weight', 'bold');
         label.setAttribute('stroke', 'white');
@@ -158,8 +177,11 @@ export default function AnnotationEditor({
         ellipse.setAttribute('rx', String(geom.rx * r.width));
         ellipse.setAttribute('ry', String(geom.ry * r.height));
         ellipse.setAttribute('fill', 'none');
-        ellipse.setAttribute('stroke', selectedShape?.id === shape.id ? '#3b82f6' : '#ef4444');
+        ellipse.setAttribute('stroke', shape.color || '#ef4444');
         ellipse.setAttribute('stroke-width', selectedShape?.id === shape.id ? '3' : '2');
+        if (selectedShape?.id === shape.id) {
+          ellipse.setAttribute('opacity', '0.95');
+        }
         ellipse.style.cursor = 'pointer';
         ellipse.addEventListener('click', () => handleShapeClick(shape));
         overlay.appendChild(ellipse);
@@ -170,7 +192,7 @@ export default function AnnotationEditor({
         label.setAttribute('y', String(geom.cy * r.height));
         label.setAttribute('text-anchor', 'middle');
         label.setAttribute('dominant-baseline', 'middle');
-        label.setAttribute('fill', '#ef4444');
+        label.setAttribute('fill', shape.color || '#ef4444');
         label.setAttribute('font-size', '16');
         label.setAttribute('font-weight', 'bold');
         label.setAttribute('stroke', 'white');
@@ -277,7 +299,8 @@ export default function AnnotationEditor({
       id: `shape_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       type: currentTool,
       geom,
-      label: labelCounter
+      label: labelCounter,
+      color: currentColor
     };
 
     setShapes((prev) => [...prev, newShape]);
@@ -355,6 +378,13 @@ export default function AnnotationEditor({
     }
   };
 
+  const handleColorSelect = (color: string) => {
+    setCurrentColor(color);
+    onColorChange?.(color);
+  };
+
+  const palette = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7'];
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -398,6 +428,20 @@ export default function AnnotationEditor({
           >
             Ellipse
           </button>
+          <div className="flex items-center gap-2 ml-2">
+            <span className="text-xs text-gray-300">Color</span>
+            <div className="flex items-center gap-1">
+              {palette.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => handleColorSelect(color)}
+                  className={`w-6 h-6 rounded-full border-2 ${currentColor === color ? 'border-white' : 'border-transparent'} hover:scale-105 transition-transform`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Use color ${color}`}
+                />
+              ))}
+            </div>
+          </div>
           <button
             onClick={handleClear}
             className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm"
