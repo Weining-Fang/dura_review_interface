@@ -1,12 +1,22 @@
-import React from 'react';
+import React, { useCallback } from 'react';
+import { useRouter } from 'next/router';
 import MapView from '../components/MapView';
 import ContextPane from '../components/ContextPane';
 import { useStore } from '../store/useStore';
 import { useSiteImageLoader } from '../hooks/useSiteImageLoader';
 
 export default function MapPage() {
+  const router = useRouter();
   const { selectedSiteIds } = useStore();
   const { handleSiteSelect, isLoading, error } = useSiteImageLoader();
+
+  const onSiteSelect = useCallback(
+    (siteId: string) => {
+      handleSiteSelect(siteId);
+      void router.push('/images');
+    },
+    [handleSiteSelect, router]
+  );
 
   return (
     <div className="h-full flex flex-col bg-white min-h-0">
@@ -23,10 +33,10 @@ export default function MapPage() {
       )}
 
       <div className="flex-1 relative min-h-0">
-        <MapView onSiteSelect={handleSiteSelect} />
+        <MapView onSiteSelect={onSiteSelect} />
       </div>
 
-      <ContextPane siteId={selectedSiteIds[0] || null} onSiteSelect={handleSiteSelect} />
+      <ContextPane siteId={selectedSiteIds[0] || null} onSiteSelect={onSiteSelect} />
     </div>
   );
 }

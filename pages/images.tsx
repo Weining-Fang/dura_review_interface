@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
+import { useRouter } from 'next/router';
 import { useStore } from '../store/useStore';
 import ComparisonStrip from '../components/ComparisonStrip';
 import Gallery from '../components/Gallery';
@@ -6,6 +7,7 @@ import IIIFViewer from '../components/IIIFViewer';
 import SiteSchematic from '../components/SiteSchematic';
 
 export default function ImagesPage() {
+  const router = useRouter();
   const {
     viewMode,
     selectedSiteIds,
@@ -21,6 +23,11 @@ export default function ImagesPage() {
     () => images.filter((img) => filteredImageIds.includes(img.id)),
     [filteredImageIds, images]
   );
+
+  const onImageSelect = (imageId: string) => {
+    setCurrentImageId(imageId);
+    void router.push('/review');
+  };
 
   // Global keyboard shortcuts relevant to the images view
   useEffect(() => {
@@ -56,10 +63,10 @@ export default function ImagesPage() {
             <SiteSchematic
               siteId={selectedSiteIds[0]}
               images={displayImages}
-              onImageSelect={setCurrentImageId}
+              onImageSelect={onImageSelect}
             />
           ) : (
-            <Gallery images={displayImages} onImageSelect={setCurrentImageId} />
+            <Gallery images={displayImages} onImageSelect={onImageSelect} />
           )
         ) : currentImageId ? (
           <IIIFViewer imageId={currentImageId} />
