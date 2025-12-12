@@ -15,6 +15,8 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<PositionsMap>({});
+  const positionsRef = useRef<PositionsMap>({});
+  const [positionsLoaded, setPositionsLoaded] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const [showIds, setShowIds] = useState(false);
@@ -30,13 +32,19 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
   // Fetch saved positions
   useEffect(() => {
     if (!siteId) return;
+    setPositionsLoaded(false);
     fetch(`/api/sites/${siteId}/image-positions`)
       .then(r => r.json())
       .then(data => {
         const saved: PositionsMap = data.positions || {};
         setPositions(saved);
+        positionsRef.current = saved;
       })
-      .catch(() => setPositions({}));
+      .catch(() => {
+        setPositions({});
+        positionsRef.current = {};
+      })
+      .finally(() => setPositionsLoaded(true));
   }, [siteId]);
 
   const containerSize = useSize(containerRef);
@@ -54,6 +62,7 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
 
   // Compute auto-grid for images missing positions (around center)
   const autoGrid = useMemo(() => {
+    if (!positionsLoaded) return {} as PositionsMap;
     const thumb = 128;
     const gap = 24;
     const idsNeeding = images
@@ -90,14 +99,16 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
       if ((placed - 1) % per === 0) ring++;
     }
     return result;
-  }, [images, positions]);
+  }, [images, positions, positionsLoaded]);
 
   // If there are new positions from autoGrid, merge them and save once
   useEffect(() => {
+    if (!positionsLoaded) return;
     const newIds = Object.keys(autoGrid);
     if (newIds.length === 0) return;
     const merged = { ...positions, ...autoGrid };
     setPositions(merged);
+    positionsRef.current = merged;
     // Save once for initialization
     savePositionsDebounced(merged, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,7 +164,11 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
     const mouseY = (e.clientY - containerRect.top) + containerRef.current.scrollTop;
     const abs = clampToBounds({ x: mouseX - dragOffset.dx, y: mouseY - dragOffset.dy }, thumbW, thumbH);
     const rel = absoluteToCenter(abs);
-    setPositions(prev => ({ ...prev, [draggingId]: rel }));
+    setPositions((prev) => {
+      const next = { ...prev, [draggingId]: rel };
+      positionsRef.current = next;
+      return next;
+    });
     lastMouseAbsRef.current = { x: mouseX, y: mouseY };
   };
 
@@ -179,7 +194,9 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
       }
     }
 
-    savePositionsDebounced(positions);
+    // Save the latest snapshot (state updates are async, so don't rely on `positions` here)
+    // Save immediately so we don't lose the update on navigation/unmount.
+    savePositionsDebounced(positionsRef.current, true);
   };
 
   const savePositionsDebounced = (next: PositionsMap, immediate = false) => {
@@ -187,18 +204,36 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
-    const run = () => {
-      fetch(`/api/sites/${siteId}/image-positions`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ positions: next })
-      }).catch(() => void 0);
+    const run = async () => {
+      try {
+        const res = await fetch(`/api/sites/${siteId}/image-positions`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ positions: next })
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          console.warn('Failed to persist image positions', res.status, text);
+        }
+      } catch (e) {
+        console.warn('Failed to persist image positions', e);
+      }
     };
     if (immediate) run();
     else saveTimer.current = window.setTimeout(run, 400);
   };
 
-  useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }, []);
+  // If we ever have a pending debounce, flush on unmount so we don't lose writes on navigation.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        savePositionsDebounced(positionsRef.current, true);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const renderNorthArrow = () => (
     <div
@@ -231,6 +266,7 @@ export default function SiteSchematic({ siteId, images, onImageSelect, onImageOp
               // Remove only those with existing positions so autoGrid re-adds them
               for (const img of images) delete next[img.id];
               setPositions(next);
+              positionsRef.current = next;
             }}
           >
             Reset layout
